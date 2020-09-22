@@ -4,13 +4,14 @@ import os
 
 import pyximport
 import numpy
+
 # setup_args needed on my MacOS
 pyximport.install(setup_args={"include_dirs": numpy.get_include()}, reload_support=True)
 
-from sbi_simulator import sim_time
-from sbi_simulator_energyScape import sim_time_energyscape
-from sbi_simulator_general import sim_time_general
-from sbi_summstats import PrinzStats
+from pyloric.sbi_simulator import sim_time
+from pyloric.sbi_simulator_energyScape import sim_time_energyscape
+from pyloric.sbi_simulator_general import sim_time_general
+from pyloric.sbi_summstats import PrinzStats
 
 
 t_burnin = 1000
@@ -21,8 +22,8 @@ dt = 0.025
 seed = 0
 
 dirname = os.path.dirname(__file__)
-neumodels = ParameterSet(dirname+'/models.prm')
-setups_dict = ParameterSet(dirname+'/setups.prm')
+neumodels = ParameterSet(dirname + "/models.prm")
+setups_dict = ParameterSet(dirname + "/setups.prm")
 
 
 def get_time():
@@ -67,15 +68,14 @@ def simulate(params, seed=None):
     )
 
     full_data = {
-        'data': data['Vs'],
-        'tmax': tmax,
-        'dt': dt,
-        'I': I,
-        'energy': data['energy'],
+        "data": data["Vs"],
+        "tmax": tmax,
+        "dt": dt,
+        "I": I,
+        "energy": data["energy"],
     }
 
     return full_data
-
 
 
 def simulate_energyscape(params, seed=None):
@@ -108,12 +108,12 @@ def simulate_energyscape(params, seed=None):
     )
 
     full_data = {
-        'data': data['Vs'],
-        'tmax': tmax,
-        'dt': dt,
-        'I': I,
-        'energy': data['energy'],
-        'all_energies': data['all_energies']
+        "data": data["Vs"],
+        "tmax": tmax,
+        "dt": dt,
+        "I": I,
+        "energy": data["energy"],
+        "all_energies": data["all_energies"],
     }
 
     return full_data
@@ -134,18 +134,22 @@ def simulate_general(params, hyperparams, seed):
     proctolin = np.asarray(hyperparams.proctolin)
 
     # define lists to loop over to assemble the parameters
-    param_classes = [hyperparams.Q10_gbar_syn,
-                     hyperparams.Q10_tau_syn,
-                     hyperparams.Q10_gbar_mem,
-                     hyperparams.Q10_tau_m,
-                     hyperparams.Q10_tau_h,
-                     hyperparams.Q10_tau_CaBuff]
-    class_defaults = [hyperparams.Q10_gbar_syn_default,
-                      hyperparams.Q10_tau_syn_default,
-                      hyperparams.Q10_gbar_mem_default,
-                      hyperparams.Q10_tau_m_default,
-                      hyperparams.Q10_tau_h_default,
-                      hyperparams.Q10_tau_CaBuff_default]
+    param_classes = [
+        hyperparams.Q10_gbar_syn,
+        hyperparams.Q10_tau_syn,
+        hyperparams.Q10_gbar_mem,
+        hyperparams.Q10_tau_m,
+        hyperparams.Q10_tau_h,
+        hyperparams.Q10_tau_CaBuff,
+    ]
+    class_defaults = [
+        hyperparams.Q10_gbar_syn_default,
+        hyperparams.Q10_tau_syn_default,
+        hyperparams.Q10_gbar_mem_default,
+        hyperparams.Q10_tau_m_default,
+        hyperparams.Q10_tau_h_default,
+        hyperparams.Q10_tau_CaBuff_default,
+    ]
 
     param_classes = np.flip(param_classes)
     class_defaults = np.flip(class_defaults)
@@ -154,8 +158,8 @@ def simulate_general(params, hyperparams, seed):
     split_parameters = []
     for pclass, classdefault in zip(param_classes, class_defaults):
         if np.any(pclass):
-            split_parameters.append(params[-np.sum(pclass):])
-            params = params[:-np.sum(pclass)]
+            split_parameters.append(params[-np.sum(pclass) :])
+            params = params[: -np.sum(pclass)]
         else:
             split_parameters.append(classdefault)
     split_parameters = np.flip(split_parameters)
@@ -165,28 +169,35 @@ def simulate_general(params, hyperparams, seed):
     # extend the parameter values for synapses, gbar and tau
     # split_parameters[0][0] = gbar q10 for glutamate synapse
     # split_parameters[0][1] = gbar q10 for cholinergic synapse
-    split_parameters[0] = [split_parameters[0][0], split_parameters[0][1],
-                           split_parameters[0][0],
-                           split_parameters[0][1], split_parameters[0][0],
-                           split_parameters[0][0],
-                           split_parameters[0][0]]  # gbar of synapses
-    split_parameters[1] = [split_parameters[1][0], split_parameters[1][1],
-                           split_parameters[1][0],
-                           split_parameters[1][1], split_parameters[1][0],
-                           split_parameters[1][0],
-                           split_parameters[1][0]]  # tau of synapses
+    split_parameters[0] = [
+        split_parameters[0][0],
+        split_parameters[0][1],
+        split_parameters[0][0],
+        split_parameters[0][1],
+        split_parameters[0][0],
+        split_parameters[0][0],
+        split_parameters[0][0],
+    ]  # gbar of synapses
+    split_parameters[1] = [
+        split_parameters[1][0],
+        split_parameters[1][1],
+        split_parameters[1][0],
+        split_parameters[1][1],
+        split_parameters[1][0],
+        split_parameters[1][0],
+        split_parameters[1][0],
+    ]  # tau of synapses
 
     # extend the parameter values for tau_m and tau_h
-    if isinstance(hyperparams.Q10_tau_m, bool): split_parameters[3] = np.tile(
-        [split_parameters[3]], 8).flatten()
-    if isinstance(hyperparams.Q10_tau_h, bool): split_parameters[4] = np.tile(
-        [split_parameters[4]], 4).flatten()
+    if isinstance(hyperparams.Q10_tau_m, bool):
+        split_parameters[3] = np.tile([split_parameters[3]], 8).flatten()
+    if isinstance(hyperparams.Q10_tau_h, bool):
+        split_parameters[4] = np.tile([split_parameters[4]], 4).flatten()
 
     # get the conductance params
     conductance_params = params  # membrane and synapse gbar
 
-    assert conductance_params.ndim == 1, 'params.ndim must be 1'
-
+    assert conductance_params.ndim == 1, "params.ndim must be 1"
 
     membrane_params = conductance_params[0:-7]
     synaptic_params = np.exp(conductance_params[-7:])
@@ -207,7 +218,9 @@ def simulate_general(params, hyperparams, seed):
             membrane_cond.append(membrane_params[current_num])
             current_num += 1
         else:
-            membrane_cond.append(proctolin[neuron_num])  # proctolin is made part of the membrane conds here.
+            membrane_cond.append(
+                proctolin[neuron_num]
+            )  # proctolin is made part of the membrane conds here.
         membrane_conds.append(np.asarray(membrane_cond))
 
     # note: make sure to generate all randomness through self.rng (!)
@@ -221,29 +234,32 @@ def simulate_general(params, hyperparams, seed):
         split_parameters[5] = [split_parameters[5]]
 
     # calling the solver --> HH.HH()
-    data = sim_time_general(dt,
-                            t,
-                            I,
-                            membrane_conds,  # membrane conductances
-                            conns,  # synaptic conductances (always variable)
-                            g_q10_conns_gbar=split_parameters[0],
-                            g_q10_conns_tau=split_parameters[1],  # Q10 synaptic tau
-                            g_q10_memb_gbar=split_parameters[2],
-                            g_q10_memb_tau_m=split_parameters[3],
-                            g_q10_memb_tau_h=split_parameters[4],
-                            g_q10_memb_tau_CaBuff=split_parameters[5],
-                            temp=hyperparams.model_params.temp,
-                            save_all_energy_currents=False,
-                            verbose=False,
-                            start_val_input=0.5
-                            )
+    data = sim_time_general(
+        dt,
+        t,
+        I,
+        membrane_conds,  # membrane conductances
+        conns,  # synaptic conductances (always variable)
+        g_q10_conns_gbar=split_parameters[0],
+        g_q10_conns_tau=split_parameters[1],  # Q10 synaptic tau
+        g_q10_memb_gbar=split_parameters[2],
+        g_q10_memb_tau_m=split_parameters[3],
+        g_q10_memb_tau_h=split_parameters[4],
+        g_q10_memb_tau_CaBuff=split_parameters[5],
+        temp=hyperparams.model_params.temp,
+        save_all_energy_currents=False,
+        verbose=False,
+        start_val_input=0.5,
+    )
 
-    return {'data': data['Vs'],
-            'params': conductance_params,
-            'tmax': tmax,
-            'dt': dt,
-            'I': I,
-            'energy': data['energy']}
+    return {
+        "data": data["Vs"],
+        "params": conductance_params,
+        "tmax": tmax,
+        "dt": dt,
+        "I": I,
+        "energy": data["energy"],
+    }
 
 
 def stats(full_data):
@@ -253,7 +269,7 @@ def stats(full_data):
         include_pyloric_ness=True,
         include_plateaus=True,
         seed=seed,
-        energy=True
+        energy=True,
     )
 
     ss = stats_object.calc([full_data])[0]
@@ -264,21 +280,24 @@ def build_conns(params):
 
     # Reversal voltages and dissipation time constants for the synapses, taken from
     # Prinz 2004, p. 1351
-    Esglut = -70            # mV
-    kminusglut = 40         # ms
+    Esglut = -70  # mV
+    kminusglut = 40  # ms
 
-    Eschol = -80            # mV
-    kminuschol = 100        # ms
+    Eschol = -80  # mV
+    kminuschol = 100  # ms
 
-    return np.asarray([
-        [1, 0, params[0], Esglut, kminusglut],
-        [1, 0, params[1], Eschol, kminuschol],
-        [2, 0, params[2], Esglut, kminusglut],
-        [2, 0, params[3], Eschol, kminuschol],
-        [0, 1, params[4], Esglut, kminusglut],
-        [2, 1, params[5], Esglut, kminusglut],
-        [1, 2, params[6], Esglut, kminusglut]
-    ])
+    return np.asarray(
+        [
+            [1, 0, params[0], Esglut, kminusglut],
+            [1, 0, params[1], Eschol, kminuschol],
+            [2, 0, params[2], Esglut, kminusglut],
+            [2, 0, params[3], Eschol, kminuschol],
+            [0, 1, params[4], Esglut, kminusglut],
+            [2, 1, params[5], Esglut, kminusglut],
+            [1, 2, params[6], Esglut, kminusglut],
+        ]
+    )
+
 
 def create_neurons(neuron_list):
     ret = []
@@ -286,6 +305,7 @@ def create_neurons(neuron_list):
         neuron = np.asarray(neumodels[n[0]][n[1]]) * n[2]
         ret.append(neuron)
     return ret
+
 
 def load_setup(name):
     return setups_dict[name]
