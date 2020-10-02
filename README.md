@@ -26,5 +26,24 @@ parameter_set = general_prior.sample((1,))
 simulation_outputs = simulate_general(parameter_set, hyperparams)
 ```
 
+### Parallelization
+One can easily parallelize the code, e.g. with joblib:
+```
+from joblib import Parallel, delayed
+
+def simulator(params_set):
+    out_target = simulate_general(
+        deepcopy(params_set[:-1].astype(np.float64)),
+        hyperparams_11,
+        seed=int(params_set[-1]),
+    )
+    return stats(out_target)
+
+simulation_outputs = Parallel(n_jobs=24)(
+    delayed(simulator)(batch)
+    for batch in params_with_seeds
+)
+```
+
 ### License
 MIT
