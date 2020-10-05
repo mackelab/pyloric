@@ -20,6 +20,7 @@ AUTHOR = "Michael Deistler"
 REQUIRES_PYTHON = ">=3.6.0"
 
 REQUIRED = [
+    "cython",
     "numpy",
     "parameters",
     "svgutils",
