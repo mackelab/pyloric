@@ -1,6 +1,8 @@
 # pyloric
 Simulator of the pyloric network in the stomatogastric ganglion (STG) in cython.
 
+The model was proposed in Prinz, Bucher, Marder, Nature Neuroscience, 2004.
+
 ### Installation 
 ```
 pip install .
