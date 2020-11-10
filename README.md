@@ -13,7 +13,7 @@ pip install .
 from pyloric import simulate, create_prior
 prior = create_prior()
 parameter_set = prior.sample((1,))
-simulation_output = simulate(parameter_set)
+simulation_output = simulate(parameter_set[0])
 ```
 
 ### Flexible simulator
@@ -26,7 +26,7 @@ hyperparams = setups_dict['collect_samples_15deg_energy_ssRanges']
 
 general_prior = create_prior_general(hyperparams)
 parameter_set = general_prior.sample((1,))
-simulation_outputs = simulate_general(parameter_set, hyperparams)
+simulation_outputs = simulate_general(parameter_set[0], hyperparams)
 ```
 
 ### Parallelization
