@@ -114,6 +114,7 @@ def simulate_energyscape(params, seed=None):
         "I": I,
         "energy": data["energy"],
         "all_energies": data["all_energies"],
+        "synapse_energies": data["synapse_energies"],
     }
 
     return full_data

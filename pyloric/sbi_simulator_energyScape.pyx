@@ -205,13 +205,13 @@ def sim_time_energyscape(dtype dt,
     cdef np.ndarray[dtype, ndim = 2] energyKd = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim = 2] energyH = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim = 2] energyLeak = np.empty_like(Ix)
+    cdef np.ndarray[dtype, ndim = 2] energySynapses = np.empty((7, Ix.shape[1]))
 
     ### Always the case if SNPE calls this, init data is passed via constructor (not supported yet)
     if init is None:        # default: simulation from initial point
         for j in range(n):
 
             Vx[j, 0] = Eleak
-
 
             Cax[j, 0] = Ca0
 
@@ -290,6 +290,7 @@ def sim_time_energyscape(dtype dt,
             csx[npost] += -conns[k,2] * sx[k, i-1]                  # positive currents inhibit spiking in our model
             Icsx[npost] += -conns[k,2] * sx[k, i-1] * conns[k,3]   # mS * 1 * mV = muA
             synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
+            energySynapses[k, i] = -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
             if synaptic_energy[npost] < 0.0:
                 print('problem, synaptic cost < 0.0!')
 
@@ -413,6 +414,6 @@ def sim_time_energyscape(dtype dt,
     all_energies = np.asarray([energyNa, energyCaT, energyCaS, energyA,
                                        energyKCa, energyKd, energyH, energyLeak])
     ret = {'Vs': Vx, 'Cas': Cax, 'ICas': ICax, 'logs': logs, 'energy': total_energy,
-           'all_energies': all_energies}
+           'all_energies': all_energies, 'synapse_energies': energySynapses}
 
     return ret
