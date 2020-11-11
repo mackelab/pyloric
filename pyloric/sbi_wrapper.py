@@ -45,7 +45,8 @@ def simulate(
     track_energy: bool = False,
     track_currents: bool = False,
     seed: Optional[int] = None,
-    **customization
+    customization: Dict = {},
+    defaults: Dict = {},
 ):
     r"""
     Runs the STG model with a subset of all parameters.
@@ -63,44 +64,49 @@ def simulate(
         seed: Possible seed for the simulation.
         customization:  If you want to exclude some of the `circuit_parameters` and use
             constant default values for them, you have to set these entries to `False`
-            in the `use_membrane` key in the `hyperparameters` dictionary. If you want
+            in the `use_membrane` key in the `customization` dictionary. If you want
             to include $Q_{10}$ values, you have to set them in the same dictionary and
             append the values of the $Q_{10}$s to the `circuit_parameters`.
+        defaults: For all parameters specified as `False` in `customization`, this
+            dictionary allows to set the default value, i.e. the value that is used for it.
     """
 
     setup_dict = {
-        "use_membrane": [
+        "membrane_gbar": [
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
         ],
-        "use_proctolin": False,
+        "proctolin_gbar": False,
         "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
         "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
         "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
         "Q10_tau_m": False,
         "Q10_tau_h": False,
         "Q10_tau_CaBuff": False,
-        "neurons": [
+    }
+    setup_dict.update(customization)
+
+    defaults_dict = {
+        "membrane_gbar": [
             ["PM", "PM_4", 0.628e-3],
             ["LP", "LP_3", 0.628e-3],
             ["PY", "PY_4", 0.628e-3],
         ],
-        "proctolin_default": [0.0, 0.0, 0.0],
-        "Q10_gbar_syn_default": [1.5, 1.5],
-        "Q10_tau_syn_default": [1.7, 1.7],
-        "Q10_gbar_mem_default": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
-        "Q10_tau_m_default": [1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7],
-        "Q10_tau_h_default": [2.8, 2.8, 2.8, 2.8],
-        "Q10_tau_CaBuff_default": 1.7,
-        "init_val": 0.0,
+        "proctolin_gbar": [0.0, 0.0, 0.0],
+        "Q10_gbar_syn": [1.5, 1.5],
+        "Q10_tau_syn": [1.7, 1.7],
+        "Q10_gbar_mem": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+        "Q10_tau_m": [1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7],
+        "Q10_tau_h": [2.8, 2.8, 2.8, 2.8],
+        "Q10_tau_CaBuff": 1.7,
     }
-    setup_dict.update(**customization)
+    defaults_dict.update(defaults)
 
     t = np.arange(0, tmax, dt)
 
-    neurons = create_neurons(setup_dict["neurons"])
-    proctolin = np.asarray(setup_dict["proctolin_default"])
+    neurons = create_neurons(setup_dict["membrane_gbar"])
+    proctolin = np.asarray(setup_dict["proctolin_gbar"])
 
     # define lists to loop over to assemble the parameters
     param_classes = [
@@ -112,12 +118,12 @@ def simulate(
         setup_dict["Q10_tau_CaBuff"],
     ]
     class_defaults = [
-        setup_dict["Q10_gbar_syn_default"],
-        setup_dict["Q10_tau_syn_default"],
-        setup_dict["Q10_gbar_mem_default"],
-        setup_dict["Q10_tau_m_default"],
-        setup_dict["Q10_tau_h_default"],
-        setup_dict["Q10_tau_CaBuff_default"],
+        defaults_dict["Q10_gbar_syn"],
+        defaults_dict["Q10_tau_syn"],
+        defaults_dict["Q10_gbar_mem"],
+        defaults_dict["Q10_tau_m"],
+        defaults_dict["Q10_tau_h"],
+        defaults_dict["Q10_tau_CaBuff"],
     ]
     param_classes.reverse()
     class_defaults.reverse()
@@ -175,12 +181,12 @@ def simulate(
     for neuron_num in range(3):  # three neurons
         membrane_cond = []
         for cond_num in range(8):  # 8 membrane conductances per neuron
-            if setup_dict["use_membrane"][neuron_num][cond_num]:
+            if setup_dict["membrane_gbar"][neuron_num][cond_num]:
                 membrane_cond.append(membrane_conductances[current_num])
                 current_num += 1
             else:
                 membrane_cond.append(neurons[neuron_num][cond_num])
-        if setup_dict["use_proctolin"]:
+        if setup_dict["proctolin_gbar"]:
             membrane_cond.append(membrane_conductances[current_num])
             current_num += 1
         else:
@@ -195,7 +201,6 @@ def simulate(
     else:
         rng = np.random.RandomState()
     I = rng.normal(scale=noise_std, size=(3, len(t)))
-    print("I", I[0, 10:20])
 
     if isinstance(split_parameters[5], float):
         split_parameters[5] = [split_parameters[5]]
@@ -220,7 +225,7 @@ def simulate(
         num_energy_timesteps=num_of_steps,
         num_energyscape_timesteps=num_energyscape_timesteps,
         init=None,
-        start_val_input=setup_dict["init_val"],
+        start_val_input=0.0,
         verbose=False,
     )
 
