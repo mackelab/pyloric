@@ -14,7 +14,7 @@ pyximport.install(
 )
 
 from pyloric.sbi_simulator import sim_time
-from pyloric.sbi_summstats import PrinzStats
+from pyloric.summary_statistics import PrinzStats
 from pyloric.utils import build_conns, create_neurons
 
 dirname = os.path.dirname(__file__)
