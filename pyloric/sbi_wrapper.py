@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import array
 from parameters import ParameterSet
 import os
 from typing import Optional, Dict
@@ -39,7 +40,7 @@ def wrapper(params):
 
 
 def simulate(
-    circuit_parameters,
+    circuit_parameters: array,
     temperature: int = 283,
     noise_std: float = 0.001,
     track_energy: bool = False,
@@ -54,13 +55,20 @@ def simulate(
     Args:
         circuit_parameters: Parameters of the circuit model. By default, this should be
             an array of shape (31,). The entries are interpreted as follows:
-            (g_AB/PD, g_LP, g_PY, g_syn).
+            (g_AB/PD, g_LP, g_PY, g_syn). The membrane conductances are ordered as:
+            Na, CaT, CaS, A, KCa, Kd, H, Leak. The seven synapses are ordered as:
+            AB-LP, PD-LP, AB-PY, PD-PY, LP-PD, LP-PY, PY-LP.
         temperature: Temperature in Kelvin that the simulation is run at.
         noise_std: Standard deviation of the noise added at every time step. Will not
             be rescaled with the step-size.
         track_energy: Whether to keep track of and return the energy consumption at any
-            step during the simulation.
-        track_currents:
+            step during the simulation. The output dictionary will have the additional
+            entry 'energy'.
+        track_currents: Tracks the conductance values of all channels (also synapses).
+            The currents can easily be computed from the conductance values by
+            $I = g \cdot (V-E)$. For the calcium channels, the reversal potential of
+            the calcium channels is also saved. The output dictionary will have
+            additional entries 'membrane_conds', 'synaptic_conds', 'reversal_calcium'.
         seed: Possible seed for the simulation.
         customization:  If you want to exclude some of the `circuit_parameters` and use
             constant default values for them, you have to set these entries to `False`
@@ -68,7 +76,8 @@ def simulate(
             to include $Q_{10}$ values, you have to set them in the same dictionary and
             append the values of the $Q_{10}$s to the `circuit_parameters`.
         defaults: For all parameters specified as `False` in `customization`, this
-            dictionary allows to set the default value, i.e. the value that is used for it.
+            dictionary allows to set the default value, i.e. the value that is used for
+            it.
     """
 
     setup_dict = {
@@ -105,8 +114,8 @@ def simulate(
 
     t = np.arange(0, tmax, dt)
 
-    neurons = create_neurons(setup_dict["membrane_gbar"])
-    proctolin = np.asarray(setup_dict["proctolin_gbar"])
+    neurons = create_neurons(defaults_dict["membrane_gbar"])
+    proctolin = np.asarray(defaults_dict["proctolin_gbar"])
 
     # define lists to loop over to assemble the parameters
     param_classes = [
@@ -195,18 +204,15 @@ def simulate(
             )  # proctolin is made part of the membrane conds here.
         membrane_conds.append(np.asarray(membrane_cond))
 
+    if isinstance(split_parameters[5], float):
+        split_parameters[5] = [split_parameters[5]]
+
     # note: make sure to generate all randomness through self.rng (!)
     if seed is not None:
         rng = np.random.RandomState(seed=seed)
     else:
         rng = np.random.RandomState()
     I = rng.normal(scale=noise_std, size=(3, len(t)))
-
-    if isinstance(split_parameters[5], float):
-        split_parameters[5] = [split_parameters[5]]
-
-    num_of_steps = len(t) if track_energy else 0
-    num_energyscape_timesteps = len(t) if track_currents else 0
 
     # calling the solver --> HH.HH()
     data = sim_time(
@@ -222,8 +228,8 @@ def simulate(
         g_q10_memb_tau_h=split_parameters[4],
         g_q10_memb_tau_CaBuff=split_parameters[5],
         temp=temperature,
-        num_energy_timesteps=num_of_steps,
-        num_energyscape_timesteps=num_energyscape_timesteps,
+        num_energy_timesteps=len(t) if track_energy else 0,
+        num_energyscape_timesteps=len(t) if track_currents else 0,
         init=None,
         start_val_input=0.0,
         verbose=False,
@@ -233,8 +239,9 @@ def simulate(
     if track_energy:
         results_dict.update({"energy": data["energy"]})
     if track_currents:
-        results_dict.update({"membrane_currents": data["energy_membrane"]})
-        results_dict.update({"synaptic_currents": data["energy_synapse"]})
+        results_dict.update({"membrane_conds": data["membrane_conds"]})
+        results_dict.update({"synaptic_conds": data["synaptic_conds"]})
+        results_dict.update({"reversal_calcium": data["reversal_calcium"]})
 
     return results_dict
 

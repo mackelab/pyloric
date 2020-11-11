@@ -232,15 +232,16 @@ def sim_time(
     cdef np.ndarray[dtype] current_synaptic_energy = np.asarray([0.0, 0.0, 0.0])
     cdef np.ndarray[dtype, ndim=2] energy_over_time = np.empty((3, num_energy_timesteps))
 
-    cdef np.ndarray[dtype, ndim = 2] energyNa = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyCaT = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyCaS = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyA = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyKCa = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyKd = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyH = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energyLeak = np.empty((3, num_energyscape_timesteps))
-    cdef np.ndarray[dtype, ndim = 2] energySynapses = np.empty((7, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_na = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_cat = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_cas = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_a = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_kca = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_kd = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_h = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_leak = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_syn = np.empty((7, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] reversal_calcium = np.empty((3, num_energyscape_timesteps))
 
     ### Always the case if SNPE calls this, init data is passed via constructor (not supported yet)
     if init == None:        # default: simulation from initial point
@@ -366,8 +367,7 @@ def sim_time(
                     print('problem, synaptic cost < 0.0!')
         if i < num_energyscape_timesteps:
             for k in range(m): # m = len(conns)
-                npost = int(conns[k,0])
-                energySynapses[k, i] = -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
+                cond_syn[k, i] = -conns[k,2] * sx[k, i-1]
 
         # Update V and [Ca] for all neurons
         for j in range(n):
@@ -399,24 +399,24 @@ def sim_time(
                 energy_over_time[j, i] = current_energy[j]
 
             if i < num_energyscape_timesteps:
-                energyNa[j, i] = cNax[j] * (Vx[j, i - 1] - ENa) ** 2
-                energyCaT[j, i] = cCaTx[j] * (Vx[j, i - 1] - ECax[j]) ** 2
-                energyCaS[j, i] = cCaSx[j] * (Vx[j, i - 1] - ECax[j]) ** 2
-                energyA[j, i] = cAx[j] * (Vx[j, i - 1] - EK) ** 2
-                energyKCa[j, i] = cKCax[j] * (Vx[j, i - 1] - EK) ** 2
-                energyKd[j, i] = cKdx[j] * (Vx[j, i - 1] - EK) ** 2
-                energyH[j, i] = cHx[j] * (Vx[j, i - 1] - EH) ** 2
-                energyLeak[j, i] = cleakx[j] * (Vx[j, i - 1] - Eleak) ** 2
+                reversal_calcium[j, i] = ECax[j]
+                cond_na[j, i] = cNax[j]
+                cond_cat[j, i] = cCaTx[j]
+                cond_cas[j, i] = cCaSx[j]
+                cond_a[j, i] = cAx[j]
+                cond_kca[j, i] = cKCax[j]
+                cond_kd[j, i] = cKdx[j]
+                cond_h[j, i] = cHx[j]
+                cond_leak[j, i] = cleakx[j]
 
             # Calculate Ca reversal potential using Nernst equation
-            ECax[j] = RToverzF * log(CaExt / Cax[j, i-1])                            # mV * 1 = mV
+            ECax[j] = RToverzF * log(CaExt / Cax[j, i-1])  # mV * 1 = mV
 
-            ICax[j, i] = (cCaTx[j] + cCaSx[j]) * (Vx[j, i-1] - ECax[j])                # mS??? * mV = muA
+            ICax[j, i] = (cCaTx[j] + cCaSx[j]) * (Vx[j, i-1] - ECax[j])  # mS??? * mV = muA
 
-            # t_Ca d[Ca]/dt = -f * (I_CaT + I_CaS) - [Ca] + [Ca]_0
             # Catau is a constant defined above
-            Cainf = Ca0 - f * ICax[j, i]                                                # (muM / muA) * muA = muM
-            Cax[j, i] = Cainf + (Cax[j, i-1] - Cainf) * exp(-dt * tau_temp_factor_CaBuff[0] / Catau)             # muM; Exponent: ms / ms = 1
+            Cainf = Ca0 - f * ICax[j, i]  # (muM / muA) * muA = muM
+            Cax[j, i] = Cainf + (Cax[j, i-1] - Cainf) * exp(-dt * tau_temp_factor_CaBuff[0] / Catau)  # muM; Exponent: ms / ms = 1
 
             Vcoeff = csx[j] + cNax[j] + cCaTx[j] + cCaSx[j] + cAx[j] + cKCax[j] + cKdx[j] + cHx[j] + cleakx[j] + cProcx[j] # mS
             Vinf_ = Icsx[j] + cNax[j] * ENa + cCaTx[j] * ECax[j] + cCaSx[j] * ECax[j] + cAx[j] * EK + cKCax[j] * EK + cKdx[j] *\
@@ -424,8 +424,8 @@ def sim_time(
             if Vcoeff == 0:
                 Vx[j, i] = Vx[j, i-1] + dt * Vinf_ / C
             else:
-                Vinf = Vinf_ / Vcoeff                       # muA / mS = mV
-                Vx[j, i] = Vinf + (Vx[j, i-1] - Vinf) * exp(-dt * Vcoeff / C)        # ms * mS / muF = 1
+                Vinf = Vinf_ / Vcoeff  # muA / mS = mV
+                Vx[j, i] = Vinf + (Vx[j, i-1] - Vinf) * exp(-dt * Vcoeff / C)  # ms * mS / muF = 1
 
         # Update gating variables
         for j in range(n):
@@ -487,13 +487,21 @@ def sim_time(
             sinf = 1 / (1 + e)
             stau =  conns[k,4] * (1 - sinf) / tau_temp_factor_conns[k]     # 1 / ms^-1 = ms
 
-            #sx[k, i] = sinf + (sx[k, i-1] - sinf) * exp(-dt / stau)  # ms / ms = 1
             sx[k, i] = sx[k, i-1] + (sinf - sx[k, i-1]) * dt / stau  # ms / ms = 1
             if dt > stau:
                 sx[k, i] = sinf
 
-    membrane_energies = np.asarray([energyNa, energyCaT, energyCaS, energyA,
-                                       energyKCa, energyKd, energyH, energyLeak])
-    membrane_energies = np.transpose(membrane_energies, (1,0,2))
-    ret = {'Vs': Vx, 'Cas': Cax, 'ICas': ICax, 'logs': logs, 'energy': energy_over_time, 'energy_membrane': membrane_energies, 'energy_synapse': energySynapses}
+    membrane_conds = np.asarray([cond_na, cond_cat, cond_cas, cond_a,
+                                       cond_kca, cond_kd, cond_h, cond_leak])
+    membrane_conds = np.transpose(membrane_conds, (1,0,2))
+    ret = {
+        'Vs': Vx,
+        'Cas': Cax,
+        'ICas': ICax,
+        'logs': logs,
+        'energy': energy_over_time,
+        'membrane_conds': membrane_conds,
+        'synaptic_conds': cond_syn,
+        'reversal_calcium': reversal_calcium,
+    }
     return ret
