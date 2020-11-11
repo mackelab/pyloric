@@ -29,36 +29,48 @@ cdef dtype getIHtaum(dtype V):
 @cython.cdivision(True)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-def sim_time_general(
-             dtype dt,
-             np.ndarray[dtype] t,
-             Ix_,
-             modelx_,
-             conns_,
-             g_q10_conns_gbar,
-             g_q10_conns_tau,
-             g_q10_memb_gbar,
-             g_q10_memb_tau_m,
-             g_q10_memb_tau_h,
-             g_q10_memb_tau_CaBuff,
-             dtype temp,
-             save_all_energy_currents = False,
-             init = None,
-             start_val_input=0.0,
-             bint verbose = True):
-    """Simulates the model for a specified time duration.
+def sim_time(
+    dtype dt,
+    np.ndarray[dtype] t,
+    Ix_,
+    modelx_,
+    conns_,
+    g_q10_conns_gbar,
+    g_q10_conns_tau,
+    g_q10_memb_gbar,
+    g_q10_memb_tau_m,
+    g_q10_memb_tau_h,
+    g_q10_memb_tau_CaBuff,
+    dtype temp,
+    num_energy_timesteps: int,
+    num_energyscape_timesteps: int,
+    init = None,
+    start_val_input=0.0,
+    bint verbose = True
+):
+    """
+    Simulates the model for a specified time duration.
 
-       dt       : timestep (mS)
-       t        : array of time values - should be np.arange(0,tmax,dt)
-       Ix       : input currents for each neuron
-       modelx   : model to use for each neuron
-       conns    : list of connections in the form [ #out, #in, strength, Es, kminus ]
-                  Units:
-                      strength:     mS
-                      Es:           mV
-                      kminus:       ms
+    Args:
+        dt: Timestep (mS)
+        t: Array of time values - should be np.arange(0,tmax,dt)
+        Ix_: Input currents for each neuron
+        modelx_: Model to use for each neuron
+        conns_: List of connections in the form [ #out, #in, strength, Es, kminus ]
+            Units: strength: mS, Es: mV, kminus: ms
+        temp: Temperature at which the simulation is run.
+        num_energy_timesteps: Until which time step the energy should be stored. The
+            vector that stores the energy has as many entries as time steps to be
+            stored. Hence, if `num_energy_timesteps=0` the memory costs are smaller.
+        init: Whether to use a custom initialization for the gating variables. If not
+            `None`, set the initial values for voltage, Ca concentration and state
+            variables.
+        start_val_input: Initial value for the some of the gating variables when
+            `init=None`.
+        verbose: Whether to show a progressbar during the simulation.
 
-       init     : initial values for voltage, Ca concentration and state variables
+    Returns:
+        Dictionary.
     """
 
     cdef dtype Nval = 0.0
@@ -216,9 +228,19 @@ def sim_time_general(
 
     cdef dtype start_val = start_val_input
 
-    cdef np.ndarray[dtype] energy = np.asarray([0.0, 0.0, 0.0])
-    cdef np.ndarray[dtype] synaptic_energy = np.asarray([0.0, 0.0, 0.0])
-    cdef np.ndarray[dtype, ndim=2] total_energy = np.empty_like(Ix)
+    cdef np.ndarray[dtype] current_energy = np.asarray([0.0, 0.0, 0.0])
+    cdef np.ndarray[dtype] current_synaptic_energy = np.asarray([0.0, 0.0, 0.0])
+    cdef np.ndarray[dtype, ndim=2] energy_over_time = np.empty((3, num_energy_timesteps))
+
+    cdef np.ndarray[dtype, ndim = 2] energyNa = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyCaT = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyCaS = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyA = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyKCa = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyKd = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyH = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energyLeak = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] energySynapses = np.empty((7, num_energyscape_timesteps))
 
     ### Always the case if SNPE calls this, init data is passed via constructor (not supported yet)
     if init == None:        # default: simulation from initial point
@@ -325,17 +347,27 @@ def sim_time_general(
         for k in range(n): # n = len(modelx)
             csx[k] = Icsx[k] = 0
 
-        synaptic_energy[0] = 0.0
-        synaptic_energy[1] = 0.0
-        synaptic_energy[2] = 0.0
+        current_synaptic_energy[0] = 0.0
+        current_synaptic_energy[1] = 0.0
+        current_synaptic_energy[2] = 0.0
 
+        # # store energy in vector
+        # if i < num_energy_timesteps:
         for k in range(m): # m = len(conns)
             npost = int(conns[k,0])
             csx[npost] += -conns[k,2] * sx[k, i-1]                  # positive currents inhibit spiking in our model
             Icsx[npost] += -conns[k,2] * sx[k, i-1] * conns[k,3]   # mS * 1 * mV = muA
-            synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
-            if synaptic_energy[npost] < 0.0:
-                print('problem, synaptic cost < 0.0!')
+
+        if i < num_energy_timesteps:
+            for k in range(m): # m = len(conns)
+                npost = int(conns[k,0])
+                current_synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
+                if current_synaptic_energy[npost] < 0.0:
+                    print('problem, synaptic cost < 0.0!')
+        if i < num_energyscape_timesteps:
+            for k in range(m): # m = len(conns)
+                npost = int(conns[k,0])
+                energySynapses[k, i] = -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
 
         # Update V and [Ca] for all neurons
         for j in range(n):
@@ -350,21 +382,31 @@ def sim_time_general(
             cleakx[j] = gleakx[j]                                                       # mS
             cProcx[j] = gProcx[j] * (mProcx[j, i - 1] ** IProcdata[0])                  # mS
 
-            # instantaneous energy stemming from membrane currents
-            energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
-                cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
-                cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
-
-            # add energy from the synapses
-            energy[j] = energy[j] + synaptic_energy[j]
-
             # store energy in vector
-            total_energy[j, i] = energy[j]
+            if i < num_energy_timesteps:
+                # instantaneous energy stemming from membrane currents
+                current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
+                    cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                    cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                    cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
+                    cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
+
+                # add energy from the synapses
+                current_energy[j] = current_energy[j] + current_synaptic_energy[j]
+                energy_over_time[j, i] = current_energy[j]
+
+            if i < num_energyscape_timesteps:
+                energyNa[j, i] = cNax[j] * (Vx[j, i - 1] - ENa) ** 2
+                energyCaT[j, i] = cCaTx[j] * (Vx[j, i - 1] - ECax[j]) ** 2
+                energyCaS[j, i] = cCaSx[j] * (Vx[j, i - 1] - ECax[j]) ** 2
+                energyA[j, i] = cAx[j] * (Vx[j, i - 1] - EK) ** 2
+                energyKCa[j, i] = cKCax[j] * (Vx[j, i - 1] - EK) ** 2
+                energyKd[j, i] = cKdx[j] * (Vx[j, i - 1] - EK) ** 2
+                energyH[j, i] = cHx[j] * (Vx[j, i - 1] - EH) ** 2
+                energyLeak[j, i] = cleakx[j] * (Vx[j, i - 1] - Eleak) ** 2
 
             # Calculate Ca reversal potential using Nernst equation
             ECax[j] = RToverzF * log(CaExt / Cax[j, i-1])                            # mV * 1 = mV
@@ -450,5 +492,8 @@ def sim_time_general(
             if dt > stau:
                 sx[k, i] = sinf
 
-    ret = {'Vs': Vx, 'Cas': Cax, 'ICas': ICax, 'logs': logs, 'energy': total_energy}
+    membrane_energies = np.asarray([energyNa, energyCaT, energyCaS, energyA,
+                                       energyKCa, energyKd, energyH, energyLeak])
+    membrane_energies = np.transpose(membrane_energies, (1,0,2))
+    ret = {'Vs': Vx, 'Cas': Cax, 'ICas': ICax, 'logs': logs, 'energy': energy_over_time, 'energy_membrane': membrane_energies, 'energy_synapse': energySynapses}
     return ret

@@ -1,25 +1,25 @@
 import numpy as np
 from parameters import ParameterSet
 import os
-
+from typing import Optional, Dict
 import pyximport
 import numpy
 
 # setup_args needed on my MacOS
-pyximport.install(setup_args={"include_dirs": numpy.get_include()}, reload_support=True)
+pyximport.install(
+    setup_args={"include_dirs": numpy.get_include()},
+    reload_support=True,
+    language_level=3,
+)
 
-from pyloric.sbi_simulator import sim_time
-from pyloric.sbi_simulator_energyScape import sim_time_energyscape
-from pyloric.sbi_simulator_general import sim_time_general
+from pyloric.sbi_simulator_general import sim_time
 from pyloric.sbi_summstats import PrinzStats
 
 
 t_burnin = 1000
 t_window = 10000
-noise_fact = 0.001
 tmax = t_burnin + t_window
 dt = 0.025
-seed = 0
 
 dirname = os.path.dirname(__file__)
 neumodels = ParameterSet(dirname + "/models.prm")
@@ -38,134 +38,99 @@ def wrapper(params):
     return ss
 
 
-def simulate(params, seed=None):
-    # note: make sure to generate all randomness through self.rng (!)
-    if seed is not None:
-        rng = np.random.RandomState(seed=seed)
-    else:
-        rng = np.random.RandomState()
-
-    t = np.arange(0, tmax, dt)
-
-    membrane_params = params[0:-7]
-    membrane_params = np.float64(np.reshape(membrane_params, (3, 8)))
-    synaptic_params = np.exp(params[-7:])
-    conns = build_conns(-synaptic_params)
-
-    I = rng.normal(scale=noise_fact, size=(3, len(t)))
-
-    # calling the solver --> HH.HH()
-    data = sim_time(
-        dt,
-        t,
-        I,
-        membrane_params,  # membrane conductances
-        conns,  # synaptic conductances (always variable)
-        temp=283,
-        init=None,
-        start_val_input=0.0,
-        verbose=False,
-    )
-
-    full_data = {
-        "data": data["Vs"],
-        "tmax": tmax,
-        "dt": dt,
-        "I": I,
-        "energy": data["energy"],
-    }
-
-    return full_data
-
-
-def simulate_energyscape(params, seed=None):
-    # note: make sure to generate all randomness through self.rng (!)
-    if seed is not None:
-        rng = np.random.RandomState(seed=seed)
-    else:
-        rng = np.random.RandomState()
-
-    t = np.arange(0, tmax, dt)
-
-    membrane_params = params[0:-7]
-    membrane_params = np.float64(np.reshape(membrane_params, (3, 8)))
-    synaptic_params = np.exp(params[-7:])
-    conns = build_conns(-synaptic_params)
-
-    I = rng.normal(scale=noise_fact, size=(3, len(t)))
-
-    # calling the solver --> HH.HH()
-    data = sim_time_energyscape(
-        dt,
-        t,
-        I,
-        membrane_params,  # membrane conductances
-        conns,  # synaptic conductances (always variable)
-        temp=283,
-        init=None,
-        start_val_input=0.0,
-        verbose=False,
-    )
-
-    full_data = {
-        "data": data["Vs"],
-        "tmax": tmax,
-        "dt": dt,
-        "I": I,
-        "energy": data["energy"],
-        "all_energies": data["all_energies"],
-        "synapse_energies": data["synapse_energies"],
-    }
-
-    return full_data
-
-
-def simulate_general(params, hyperparams, seed):
-    """
+def simulate(
+    circuit_parameters,
+    temperature: int = 283,
+    noise_std: float = 0.001,
+    track_energy: bool = False,
+    track_currents: bool = False,
+    seed: Optional[int] = None,
+    **customization
+):
+    r"""
     Runs the STG model with a subset of all parameters.
 
-    The parameters are specified in params. The setup file hyperparams defines which
-    parameters these values should be assigned to. The remaining parameters are filled
-    with default values.
+    Args:
+        circuit_parameters: Parameters of the circuit model. By default, this should be
+            an array of shape (31,). The entries are interpreted as follows:
+            (g_AB/PD, g_LP, g_PY, g_syn).
+        temperature: Temperature in Kelvin that the simulation is run at.
+        noise_std: Standard deviation of the noise added at every time step. Will not
+            be rescaled with the step-size.
+        track_energy: Whether to keep track of and return the energy consumption at any
+            step during the simulation.
+        track_currents:
+        seed: Possible seed for the simulation.
+        customization:  If you want to exclude some of the `circuit_parameters` and use
+            constant default values for them, you have to set these entries to `False`
+            in the `use_membrane` key in the `hyperparameters` dictionary. If you want
+            to include $Q_{10}$ values, you have to set them in the same dictionary and
+            append the values of the $Q_{10}$s to the `circuit_parameters`.
     """
+
+    setup_dict = {
+        "use_membrane": [
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+        ],
+        "use_proctolin": False,
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
+        "Q10_tau_m": False,
+        "Q10_tau_h": False,
+        "Q10_tau_CaBuff": False,
+        "neurons": [
+            ["PM", "PM_4", 0.628e-3],
+            ["LP", "LP_3", 0.628e-3],
+            ["PY", "PY_4", 0.628e-3],
+        ],
+        "proctolin_default": [0.0, 0.0, 0.0],
+        "Q10_gbar_syn_default": [1.5, 1.5],
+        "Q10_tau_syn_default": [1.7, 1.7],
+        "Q10_gbar_mem_default": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+        "Q10_tau_m_default": [1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7],
+        "Q10_tau_h_default": [2.8, 2.8, 2.8, 2.8],
+        "Q10_tau_CaBuff_default": 1.7,
+        "init_val": 0.0,
+    }
+    setup_dict.update(**customization)
 
     t = np.arange(0, tmax, dt)
 
-    neurons = create_neurons(hyperparams.neurons)
-    proctolin = np.asarray(hyperparams.proctolin)
+    neurons = create_neurons(setup_dict["neurons"])
+    proctolin = np.asarray(setup_dict["proctolin_default"])
 
     # define lists to loop over to assemble the parameters
     param_classes = [
-        hyperparams.Q10_gbar_syn,
-        hyperparams.Q10_tau_syn,
-        hyperparams.Q10_gbar_mem,
-        hyperparams.Q10_tau_m,
-        hyperparams.Q10_tau_h,
-        hyperparams.Q10_tau_CaBuff,
+        setup_dict["Q10_gbar_syn"],
+        setup_dict["Q10_tau_syn"],
+        setup_dict["Q10_gbar_mem"],
+        setup_dict["Q10_tau_m"],
+        setup_dict["Q10_tau_h"],
+        setup_dict["Q10_tau_CaBuff"],
     ]
     class_defaults = [
-        hyperparams.Q10_gbar_syn_default,
-        hyperparams.Q10_tau_syn_default,
-        hyperparams.Q10_gbar_mem_default,
-        hyperparams.Q10_tau_m_default,
-        hyperparams.Q10_tau_h_default,
-        hyperparams.Q10_tau_CaBuff_default,
+        setup_dict["Q10_gbar_syn_default"],
+        setup_dict["Q10_tau_syn_default"],
+        setup_dict["Q10_gbar_mem_default"],
+        setup_dict["Q10_tau_m_default"],
+        setup_dict["Q10_tau_h_default"],
+        setup_dict["Q10_tau_CaBuff_default"],
     ]
-
-    param_classes = np.flip(param_classes)
-    class_defaults = np.flip(class_defaults)
+    param_classes.reverse()
+    class_defaults.reverse()
 
     # loop over lists
     split_parameters = []
     for pclass, classdefault in zip(param_classes, class_defaults):
         if np.any(pclass):
-            split_parameters.append(params[-np.sum(pclass) :])
-            params = params[: -np.sum(pclass)]
+            split_parameters.append(circuit_parameters[-np.sum(pclass) :])
+            circuit_parameters = circuit_parameters[: -np.sum(pclass)]
         else:
             split_parameters.append(classdefault)
-    split_parameters = np.flip(split_parameters)
-
-    # split_parameters = class_defaults
+    split_parameters.reverse()
 
     # extend the parameter values for synapses, gbar and tau
     # split_parameters[0][0] = gbar q10 for glutamate synapse
@@ -190,19 +155,19 @@ def simulate_general(params, hyperparams, seed):
     ]  # tau of synapses
 
     # extend the parameter values for tau_m and tau_h
-    if isinstance(hyperparams.Q10_tau_m, bool):
+    if isinstance(setup_dict["Q10_tau_m"], bool):
         split_parameters[3] = np.tile([split_parameters[3]], 8).flatten()
-    if isinstance(hyperparams.Q10_tau_h, bool):
+    if isinstance(setup_dict["Q10_tau_h"], bool):
         split_parameters[4] = np.tile([split_parameters[4]], 4).flatten()
 
     # get the conductance params
-    conductance_params = params  # membrane and synapse gbar
+    conductance_params = circuit_parameters  # membrane and synapse gbar
 
     assert conductance_params.ndim == 1, "params.ndim must be 1"
 
-    membrane_params = conductance_params[0:-7]
-    synaptic_params = np.exp(conductance_params[-7:])
-    conns = build_conns(-synaptic_params)
+    membrane_conductances = conductance_params[0:-7]
+    synaptic_conductances = np.exp(conductance_params[-7:])
+    conns = build_conns(-synaptic_conductances)
 
     # build the used membrane conductances as parameters. Rest as fixed values.
     current_num = 0
@@ -210,13 +175,13 @@ def simulate_general(params, hyperparams, seed):
     for neuron_num in range(3):  # three neurons
         membrane_cond = []
         for cond_num in range(8):  # 8 membrane conductances per neuron
-            if hyperparams.use_membrane[neuron_num][cond_num]:
-                membrane_cond.append(membrane_params[current_num])
+            if setup_dict["use_membrane"][neuron_num][cond_num]:
+                membrane_cond.append(membrane_conductances[current_num])
                 current_num += 1
             else:
                 membrane_cond.append(neurons[neuron_num][cond_num])
-        if hyperparams.use_proctolin:
-            membrane_cond.append(membrane_params[current_num])
+        if setup_dict["use_proctolin"]:
+            membrane_cond.append(membrane_conductances[current_num])
             current_num += 1
         else:
             membrane_cond.append(
@@ -229,13 +194,17 @@ def simulate_general(params, hyperparams, seed):
         rng = np.random.RandomState(seed=seed)
     else:
         rng = np.random.RandomState()
-    I = rng.normal(scale=hyperparams.noise_fact, size=(3, len(t)))
+    I = rng.normal(scale=noise_std, size=(3, len(t)))
+    print("I", I[0, 10:20])
 
     if isinstance(split_parameters[5], float):
         split_parameters[5] = [split_parameters[5]]
 
+    num_of_steps = len(t) if track_energy else 0
+    num_energyscape_timesteps = len(t) if track_currents else 0
+
     # calling the solver --> HH.HH()
-    data = sim_time_general(
+    data = sim_time(
         dt,
         t,
         I,
@@ -247,20 +216,22 @@ def simulate_general(params, hyperparams, seed):
         g_q10_memb_tau_m=split_parameters[3],
         g_q10_memb_tau_h=split_parameters[4],
         g_q10_memb_tau_CaBuff=split_parameters[5],
-        temp=hyperparams.model_params.temp,
-        save_all_energy_currents=False,
+        temp=temperature,
+        num_energy_timesteps=num_of_steps,
+        num_energyscape_timesteps=num_energyscape_timesteps,
+        init=None,
+        start_val_input=setup_dict["init_val"],
         verbose=False,
-        start_val_input=0.5,
     )
 
-    return {
-        "data": data["Vs"],
-        "params": conductance_params,
-        "tmax": tmax,
-        "dt": dt,
-        "I": I,
-        "energy": data["energy"],
-    }
+    results_dict = {"voltage": data["Vs"]}
+    if track_energy:
+        results_dict.update({"energy": data["energy"]})
+    if track_currents:
+        results_dict.update({"membrane_currents": data["energy_membrane"]})
+        results_dict.update({"synaptic_currents": data["energy_synapse"]})
+
+    return results_dict
 
 
 def stats(full_data):
@@ -269,7 +240,7 @@ def stats(full_data):
         t_off=t_burnin + t_window,
         include_pyloric_ness=True,
         include_plateaus=True,
-        seed=seed,
+        seed=0,
         energy=True,
     )
 
