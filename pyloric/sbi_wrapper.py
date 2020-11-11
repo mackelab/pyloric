@@ -13,34 +13,19 @@ pyximport.install(
     language_level=3,
 )
 
-from pyloric.sbi_simulator_general import sim_time
+from pyloric.sbi_simulator import sim_time
 from pyloric.sbi_summstats import PrinzStats
-
-
-t_burnin = 1000
-t_window = 10000
-tmax = t_burnin + t_window
-dt = 0.025
+from pyloric.utils import build_conns, create_neurons
 
 dirname = os.path.dirname(__file__)
 neumodels = ParameterSet(dirname + "/models.prm")
 setups_dict = ParameterSet(dirname + "/setups.prm")
 
 
-def get_time():
-    return np.arange(0, tmax, dt)
-
-
-def wrapper(params):
-
-    full_data = simulate(params)
-    ss = stats(full_data)
-
-    return ss
-
-
 def simulate(
     circuit_parameters: array,
+    dt: float = 0.025,
+    t_max: int = 11000,
     temperature: int = 283,
     noise_std: float = 0.001,
     track_energy: bool = False,
@@ -58,6 +43,8 @@ def simulate(
             (g_AB/PD, g_LP, g_PY, g_syn). The membrane conductances are ordered as:
             Na, CaT, CaS, A, KCa, Kd, H, Leak. The seven synapses are ordered as:
             AB-LP, PD-LP, AB-PY, PD-PY, LP-PD, LP-PY, PY-LP.
+        dt: Step size in milliseconds.
+        t_max: Overall runtime of the simulation in milliseconds.
         temperature: Temperature in Kelvin that the simulation is run at.
         noise_std: Standard deviation of the noise added at every time step. Will not
             be rescaled with the step-size.
@@ -110,7 +97,7 @@ def simulate(
     }
     defaults_dict.update(defaults)
 
-    t = np.arange(0, tmax, dt)
+    t = np.arange(0, t_max, dt)
 
     neurons = create_neurons(defaults_dict["membrane_gbar"])
 
@@ -236,10 +223,10 @@ def simulate(
     return results_dict
 
 
-def stats(full_data):
+def stats(full_data, t_burnin, t_max):
     stats_object = PrinzStats(
         t_on=t_burnin,
-        t_off=t_burnin + t_window,
+        t_off=t_max,
         include_pyloric_ness=True,
         include_plateaus=True,
         seed=0,
@@ -248,38 +235,3 @@ def stats(full_data):
 
     ss = stats_object.calc([full_data])[0]
     return ss
-
-
-def build_conns(params):
-
-    # Reversal voltages and dissipation time constants for the synapses, taken from
-    # Prinz 2004, p. 1351
-    Esglut = -70  # mV
-    kminusglut = 40  # ms
-
-    Eschol = -80  # mV
-    kminuschol = 100  # ms
-
-    return np.asarray(
-        [
-            [1, 0, params[0], Esglut, kminusglut],
-            [1, 0, params[1], Eschol, kminuschol],
-            [2, 0, params[2], Esglut, kminusglut],
-            [2, 0, params[3], Eschol, kminuschol],
-            [0, 1, params[4], Esglut, kminusglut],
-            [2, 1, params[5], Esglut, kminusglut],
-            [1, 2, params[6], Esglut, kminusglut],
-        ]
-    )
-
-
-def create_neurons(neuron_list):
-    ret = []
-    for n in neuron_list:
-        neuron = np.asarray(neumodels[n[0]][n[1]]) * n[2]
-        ret.append(neuron)
-    return ret
-
-
-def load_setup(name):
-    return setups_dict[name]

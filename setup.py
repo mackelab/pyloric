@@ -23,7 +23,6 @@ REQUIRED = [
     "tqdm",
     "cython",
     "numpy",
-    "parameters",
     "sbi",
     "scipy",
     "svgutils",
