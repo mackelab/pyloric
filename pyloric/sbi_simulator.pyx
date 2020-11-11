@@ -7,9 +7,10 @@ import numpy as np
 cimport numpy as np
 import time
 
+# the first line was hashtag-exclamation_mark/cm/shared/apps/python/3.5.1/bin/python3
+
 import cython
 cimport cython
-
 
 ctypedef double dtype
 
@@ -25,7 +26,6 @@ cdef dtype getINatauh(dtype V):
 cdef dtype getIHtaum(dtype V):
     return 2.0 / (exp(-14.59 - 0.086 * V) + exp(-1.87 + 0.0701 * V))
 
-
 @cython.cdivision(True)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
@@ -35,11 +35,18 @@ def sim_time(
     Ix_,
     modelx_,
     conns_,
+    g_q10_conns_gbar,
+    g_q10_conns_tau,
+    g_q10_memb_gbar,
+    g_q10_memb_tau_m,
+    g_q10_memb_tau_h,
+    g_q10_memb_tau_CaBuff,
     dtype temp,
     num_energy_timesteps: int,
+    num_energyscape_timesteps: int,
     init = None,
     start_val_input=0.0,
-    bint verbose=False
+    bint verbose = True
 ):
     """
     Simulates the model for a specified time duration.
@@ -76,7 +83,6 @@ def sim_time(
     cdef np.ndarray[dtype] IKCadata    = np.asarray([ 4   , 28.3  , -12.6 , Nval  , Nval  , 180.6 , -150.2, 46    , -22.7 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IKddata     = np.asarray([ 4   , 12.3  , -11.8 , Nval  , Nval  , 14.4  , -12.8 , 28.3  , -19.2 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IHdata      = np.asarray([ 1   , 75    , 5.5   , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
-    cdef np.ndarray[dtype] IProcdata   = np.asarray([ 1   , 12    , -3.05 , Nval  , Nval  , 0.5   , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
 
     cdef dtype Esglut = -70
     cdef dtype kminusglut = 40
@@ -84,10 +90,27 @@ def sim_time(
     cdef dtype Eschol = -80
     cdef dtype kminuschol = 100
 
+    # Q10s for synapses
+    cdef np.ndarray[dtype, ndim=1] g_temp_factor_conns   = np.asarray(g_q10_conns_gbar) ** ((temp - 283) / 10)
+    cdef np.ndarray[dtype, ndim=1] tau_temp_factor_conns = np.asarray(g_q10_conns_tau) ** ((temp - 283) / 10)
+
+    # Q10s for membrane gbar
+    cdef np.ndarray[dtype, ndim=1] g_temp_factor_memb    = np.asarray(g_q10_memb_gbar) ** ((temp - 283) / 10)
+
+    # Q10s for membrane tau m
+    cdef np.ndarray[dtype, ndim=1] tau_temp_factor_m  = np.asarray(g_q10_memb_tau_m) ** ((temp - 283) / 10)
+
+    # Q10s for membrane tau h
+    cdef np.ndarray[dtype, ndim=1] tau_temp_factor_h  = np.asarray(g_q10_memb_tau_h) ** ((temp - 283) / 10)
+
+    # Q10s for membrane tau CaBuff
+    cdef np.ndarray[dtype, ndim=1] tau_temp_factor_CaBuff  = np.asarray(g_q10_memb_tau_CaBuff) ** ((temp - 283) / 10)
+
     # Convert the arguments from lists to numpy arrays
     cdef np.ndarray[dtype, ndim=2] Ix = np.asarray(Ix_)
     cdef np.ndarray[dtype, ndim=2] modelx = np.asarray(modelx_)
     cdef np.ndarray[dtype, ndim=2] conns = np.asarray(conns_)
+    conns[:,2] = conns[:,2] * g_temp_factor_conns
 
     cdef int n = len(modelx) # number of neurons
     cdef int m = len(conns) # number of connections
@@ -97,19 +120,19 @@ def sim_time(
 
     modelx = np.asarray(modelx)
 
-    # Parameters
-    cdef np.ndarray[dtype] gNax    = modelx.T[0]
-    cdef np.ndarray[dtype] gCaTx   = modelx.T[1]
-    cdef np.ndarray[dtype] gCaSx   = modelx.T[2]
-    cdef np.ndarray[dtype] gAx     = modelx.T[3]
-    cdef np.ndarray[dtype] gKCax   = modelx.T[4]
-    cdef np.ndarray[dtype] gKdx    = modelx.T[5]
-    cdef np.ndarray[dtype] gHx     = modelx.T[6]
-    cdef np.ndarray[dtype] gleakx  = modelx.T[7]
-
     # adding the Q10-value
     #cdef dtype g_q10 = 1.5
     #cdef dtype g_temp_factor = g_q10 ** ((temp - 283) / 10)
+
+    # Parameters
+    cdef np.ndarray[dtype] gNax    = modelx.T[0] * g_temp_factor_memb[0]
+    cdef np.ndarray[dtype] gCaTx   = modelx.T[1] * g_temp_factor_memb[1]
+    cdef np.ndarray[dtype] gCaSx   = modelx.T[2] * g_temp_factor_memb[2]
+    cdef np.ndarray[dtype] gAx     = modelx.T[3] * g_temp_factor_memb[3]
+    cdef np.ndarray[dtype] gKCax   = modelx.T[4] * g_temp_factor_memb[4]
+    cdef np.ndarray[dtype] gKdx    = modelx.T[5] * g_temp_factor_memb[5]
+    cdef np.ndarray[dtype] gHx     = modelx.T[6] * g_temp_factor_memb[6]
+    cdef np.ndarray[dtype] gleakx  = modelx.T[7] * g_temp_factor_memb[7]
 
     # Constants
     cdef dtype C = 0.6283e-3
@@ -118,7 +141,6 @@ def sim_time(
     cdef dtype EK = -80
     cdef dtype EH = -20
     cdef dtype Eleak = -50
-    cdef dtype EProc = 0.0
 
     cdef dtype Catau = 200
     cdef dtype f = 14961
@@ -152,7 +174,6 @@ def sim_time(
     cdef np.ndarray[dtype, ndim=2] mKCax   = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] mKdx    = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] mHx     = np.empty_like(Ix)
-    cdef np.ndarray[dtype, ndim=2] mProcx  = np.empty_like(Ix)
 
     cdef np.ndarray[dtype, ndim=2] hNax    = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] hCaTx   = np.empty_like(Ix)
@@ -172,7 +193,6 @@ def sim_time(
     cdef np.ndarray[dtype] cKdx = np.zeros(n)           # mS
     cdef np.ndarray[dtype] cHx = np.zeros(n)            # mS
     cdef np.ndarray[dtype] cleakx = np.zeros(n)         # mS
-    cdef np.ndarray[dtype] cProcx = np.zeros(n)         # mS
 
     # Synapse state variables
     cdef np.ndarray[dtype] csx      = np.empty(m)
@@ -188,7 +208,6 @@ def sim_time(
     cdef dtype mKCatau, mKCainf
     cdef dtype mKdtau, mKdinf
     cdef dtype mHtau, mHinf
-    cdef dtype mProctau, mProcinf
 
     cdef dtype hNatau, hNainf
     cdef dtype hCaTtau, hCaTinf
@@ -207,34 +226,72 @@ def sim_time(
     cdef np.ndarray[dtype] current_synaptic_energy = np.asarray([0.0, 0.0, 0.0])
     cdef np.ndarray[dtype, ndim=2] energy_over_time = np.empty((3, num_energy_timesteps))
 
+    cdef np.ndarray[dtype, ndim = 2] cond_na = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_cat = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_cas = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_a = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_kca = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_kd = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_h = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_leak = np.empty((3, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] cond_syn = np.empty((7, num_energyscape_timesteps))
+    cdef np.ndarray[dtype, ndim = 2] reversal_calcium = np.empty((3, num_energyscape_timesteps))
+
     ### Always the case if SNPE calls this, init data is passed via constructor (not supported yet)
-    if init is None:        # default: simulation from initial point
+    if init == None:        # default: simulation from initial point
         for j in range(n):
 
             Vx[j, 0] = Eleak
 
+            init_inf = False
+            if init_inf == True:
+                mNainf = mhtt(Vx[j, 0], INadata[1], INadata[2])
+                mCaTinf = mhtt(Vx[j, 0], ICaTdata[1], ICaTdata[2])
+                mCaSinf = mhtt(Vx[j, 0], ICaSdata[1], ICaSdata[2])
+                mAinf = mhtt(Vx[j, 0], IAdata[1], IAdata[2])
+                mKCainf = (Cax[j, 0] / (Cax[j, 0] + 3)) * mhtt(Vx[j, 0], IKCadata[1], IKCadata[2])
+                mKdinf = mhtt(Vx[j, 0], IKddata[1], IKddata[2])
+                mHinf = mhtt(Vx[j, 0], IHdata[1], IHdata[2])
+                hNainf = mhtt(Vx[j, 0], INadata[3], INadata[4])
+                hCaTinf = mhtt(Vx[j, 0], ICaTdata[3], ICaTdata[4])
+                hCaSinf = mhtt(Vx[j, 0], ICaSdata[3], ICaSdata[4])
+                hAinf = mhtt(Vx[j, 0], IAdata[3], IAdata[4])
 
-            Cax[j, 0] = Ca0
+                Cax[j, 0] = Ca0
 
-            hNax[j, 0] = 1
-            hCaTx[j, 0] = 1
-            hCaSx[j, 0] = 1
-            hAx[j, 0] = 1
+                mNax[j, 0] = mNainf
+                mCaTx[j, 0] = mCaTinf
+                mCaSx[j, 0] = mCaSinf
+                mAx[j, 0] = mAinf
+                mKCax[j, 0] = mKCainf
+                mKdx[j, 0] = mKdinf
+                mHx[j, 0] = mHinf
 
-            mNax[j, 0] = start_val
-            mCaTx[j, 0] = start_val
-            mCaSx[j, 0] = start_val
-            mAx[j, 0] = start_val
-            mKCax[j, 0] = start_val
-            mKdx[j, 0] = start_val
-            mHx[j, 0] = start_val
-            mProcx[j, 0] = start_val
-            hNax[j, 0] = start_val
-            hCaTx[j, 0] = start_val
-            hCaSx[j, 0] = start_val
-            hAx[j, 0] = start_val
+                hNax[j, 0] = hNainf
+                hCaTx[j, 0] = hCaTinf
+                hCaSx[j, 0] = hCaSinf
+                hAx[j, 0] = hAinf
+            else:
+                Cax[j, 0] = Ca0
 
-        # ICa is calculated later
+                hNax[j, 0] = 1
+                hCaTx[j, 0] = 1
+                hCaSx[j, 0] = 1
+                hAx[j, 0] = 1
+
+                mNax[j, 0] = start_val
+                mCaTx[j, 0] = start_val
+                mCaSx[j, 0] = start_val
+                mAx[j, 0] = start_val
+                mKCax[j, 0] = start_val
+                mKdx[j, 0] = start_val
+                mHx[j, 0] = start_val
+                hNax[j, 0] = start_val
+                hCaTx[j, 0] = start_val
+                hCaSx[j, 0] = start_val
+                hAx[j, 0] = start_val
+
+            # ICa is calculated later
 
     else:                  # simulation from given points
         for i in range(n):
@@ -249,7 +306,6 @@ def sim_time(
             mKCax[i, 0] = data[6]
             mKdx[i, 0] = data[7]
             mHx[i, 0] = data[8]
-            mProcx[i, 0] = data[9]
 
             hNax[i, 0] = data[10]
             hCaTx[i, 0] = data[11]
@@ -286,13 +342,22 @@ def sim_time(
         current_synaptic_energy[1] = 0.0
         current_synaptic_energy[2] = 0.0
 
+        # # store energy in vector
+        # if i < num_energy_timesteps:
         for k in range(m): # m = len(conns)
             npost = int(conns[k,0])
             csx[npost] += -conns[k,2] * sx[k, i-1]                  # positive currents inhibit spiking in our model
             Icsx[npost] += -conns[k,2] * sx[k, i-1] * conns[k,3]   # mS * 1 * mV = muA
-            current_synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
-            if current_synaptic_energy[npost] < 0.0:
-                print('problem, synaptic cost < 0.0!')
+
+        if i < num_energy_timesteps:
+            for k in range(m): # m = len(conns)
+                npost = int(conns[k,0])
+                current_synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
+                if current_synaptic_energy[npost] < 0.0:
+                    print('problem, synaptic cost < 0.0!')
+        if i < num_energyscape_timesteps:
+            for k in range(m): # m = len(conns)
+                cond_syn[k, i] = -conns[k,2] * sx[k, i-1]
 
         # Update V and [Ca] for all neurons
         for j in range(n):
@@ -306,32 +371,41 @@ def sim_time(
             cHx[j] = gHx[j] * (mHx[j, i - 1] ** IHdata[0])                              # mS
             cleakx[j] = gleakx[j]                                                       # mS
 
-            # instantaneous energy stemming from membrane currents
-            current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
-                cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
-                cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
-
-            # add energy from the synapses
-            current_energy[j] = current_energy[j] + current_synaptic_energy[j]
-
             # store energy in vector
             if i < num_energy_timesteps:
+                # instantaneous energy stemming from membrane currents
+                current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
+                    cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                    cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                    cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                    cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
+                    cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
+
+                # add energy from the synapses
+                current_energy[j] = current_energy[j] + current_synaptic_energy[j]
                 energy_over_time[j, i] = current_energy[j]
 
+            if i < num_energyscape_timesteps:
+                reversal_calcium[j, i] = ECax[j]
+                cond_na[j, i] = cNax[j]
+                cond_cat[j, i] = cCaTx[j]
+                cond_cas[j, i] = cCaSx[j]
+                cond_a[j, i] = cAx[j]
+                cond_kca[j, i] = cKCax[j]
+                cond_kd[j, i] = cKdx[j]
+                cond_h[j, i] = cHx[j]
+                cond_leak[j, i] = cleakx[j]
+
             # Calculate Ca reversal potential using Nernst equation
-            ECax[j] = RToverzF * log(CaExt / Cax[j, i-1])                            # mV * 1 = mV
+            ECax[j] = RToverzF * log(CaExt / Cax[j, i-1])  # mV * 1 = mV
 
-            ICax[j, i] = (cCaTx[j] + cCaSx[j]) * (Vx[j, i-1] - ECax[j])                # mS??? * mV = muA
+            ICax[j, i] = (cCaTx[j] + cCaSx[j]) * (Vx[j, i-1] - ECax[j])  # mS??? * mV = muA
 
-            # t_Ca d[Ca]/dt = -f * (I_CaT + I_CaS) - [Ca] + [Ca]_0
             # Catau is a constant defined above
-            Cainf = Ca0 - f * ICax[j, i]                                                # (muM / muA) * muA = muM
-            Cax[j, i] = Cainf + (Cax[j, i-1] - Cainf) * exp(-dt / Catau)             # muM; Exponent: ms / ms = 1
+            Cainf = Ca0 - f * ICax[j, i]  # (muM / muA) * muA = muM
+            Cax[j, i] = Cainf + (Cax[j, i-1] - Cainf) * exp(-dt * tau_temp_factor_CaBuff[0] / Catau)  # muM; Exponent: ms / ms = 1
 
             Vcoeff = csx[j] + cNax[j] + cCaTx[j] + cCaSx[j] + cAx[j] + cKCax[j] + cKdx[j] + cHx[j] + cleakx[j] # mS
             Vinf_ = Icsx[j] + cNax[j] * ENa + cCaTx[j] * ECax[j] + cCaSx[j] * ECax[j] + cAx[j] * EK + cKCax[j] * EK + cKdx[j] *\
@@ -339,8 +413,8 @@ def sim_time(
             if Vcoeff == 0:
                 Vx[j, i] = Vx[j, i-1] + dt * Vinf_ / C
             else:
-                Vinf = Vinf_ / Vcoeff                       # muA / mS = mV
-                Vx[j, i] = Vinf + (Vx[j, i-1] - Vinf) * exp(-dt * Vcoeff / C)        # ms * mS / muF = 1
+                Vinf = Vinf_ / Vcoeff  # muA / mS = mV
+                Vx[j, i] = Vinf + (Vx[j, i-1] - Vinf) * exp(-dt * Vcoeff / C)  # ms * mS / muF = 1
 
         # Update gating variables
         for j in range(n):
@@ -349,59 +423,70 @@ def sim_time(
             # Use old values for V instead of new ones? i -> i-1
             mNainf = mhtt(Vx[j, i-1], INadata[1], INadata[2])
             mNatau = INadata[5] + INadata[6] * mhtt(Vx[j, i-1], INadata[7], INadata[8])       # ms
-            mNax[j, i] = mNainf + (mNax[j, i-1] - mNainf) * exp(-dt / mNatau)
+            mNax[j, i] = mNainf + (mNax[j, i-1] - mNainf) * exp(-dt * tau_temp_factor_m[0] / mNatau)
 
             mCaTinf = mhtt(Vx[j, i-1], ICaTdata[1], ICaTdata[2])
             mCaTtau = ICaTdata[5] + ICaTdata[6] * mhtt(Vx[j, i-1], ICaTdata[7], ICaTdata[8])  # ms
-            mCaTx[j, i] = mCaTinf + (mCaTx[j, i-1] - mCaTinf) * exp(-dt / mCaTtau)
+            mCaTx[j, i] = mCaTinf + (mCaTx[j, i-1] - mCaTinf) * exp(-dt * tau_temp_factor_m[1] / mCaTtau)
 
             mCaSinf = mhtt(Vx[j, i-1], ICaSdata[1], ICaSdata[2])
             mCaStau = ICaSdata[5] + ICaSdata[6] * mhtt2(Vx[j, i-1], ICaSdata[7], ICaSdata[8], ICaSdata[9], ICaSdata[10])    # ms
-            mCaSx[j, i] = mCaSinf + (mCaSx[j, i-1] - mCaSinf) * exp(-dt / mCaStau)
+            mCaSx[j, i] = mCaSinf + (mCaSx[j, i-1] - mCaSinf) * exp(-dt * tau_temp_factor_m[2] / mCaStau)
 
             mAinf = mhtt(Vx[j, i-1], IAdata[1], IAdata[2])
             mAtau = IAdata[5] + IAdata[6] * mhtt(Vx[j, i-1], IAdata[7], IAdata[8])            # ms
-            mAx[j, i] = mAinf + (mAx[j, i-1] - mAinf) * exp(-dt / mAtau)
+            mAx[j, i] = mAinf + (mAx[j, i-1] - mAinf) * exp(-dt * tau_temp_factor_m[3] / mAtau)
 
             mKCainf = (Cax[j, i-1] / (Cax[j, i-1] + 3)) * mhtt(Vx[j, i-1], IKCadata[1], IKCadata[2])
             mKCatau = IKCadata[5] + IKCadata[6] * mhtt(Vx[j, i-1], IKCadata[7], IKCadata[8])  # ms
-            mKCax[j, i] = mKCainf + (mKCax[j, i-1] - mKCainf) * exp(-dt / mKCatau)
+            mKCax[j, i] = mKCainf + (mKCax[j, i-1] - mKCainf) * exp(-dt * tau_temp_factor_m[4] / mKCatau)
 
             mKdinf = mhtt(Vx[j, i-1], IKddata[1], IKddata[2])
             mKdtau = IKddata[5] + IKddata[6] * mhtt(Vx[j, i-1], IKddata[7], IKddata[8])       # ms
-            mKdx[j, i] = mKdinf + (mKdx[j, i-1] - mKdinf) * exp(-dt / mKdtau)
+            mKdx[j, i] = mKdinf + (mKdx[j, i-1] - mKdinf) * exp(-dt * tau_temp_factor_m[5] / mKdtau)
 
             mHinf = mhtt(Vx[j, i-1], IHdata[1], IHdata[2])
             mHtau = getIHtaum(Vx[j, i-1])
-            mHx[j, i] = mHinf + (mHx[j, i-1] - mHinf) * exp(-dt / mHtau)
+            mHx[j, i] = mHinf + (mHx[j, i-1] - mHinf) * exp(-dt * tau_temp_factor_m[6] / mHtau)
 
             hNainf = mhtt(Vx[j, i-1], INadata[3], INadata[4])
             hNatau = getINatauh(Vx[j, i-1])                   # ms
-            hNax[j, i] = hNainf + (hNax[j, i-1] - hNainf) * exp(-dt / hNatau)
+            hNax[j, i] = hNainf + (hNax[j, i-1] - hNainf) * exp(-dt * tau_temp_factor_h[0] / hNatau)
 
             hCaTinf = mhtt(Vx[j, i-1], ICaTdata[3], ICaTdata[4])
             hCaTtau = ICaTdata[11] + ICaTdata[12] * mhtt(Vx[j, i-1], ICaTdata[13], ICaTdata[14])      # ms
-            hCaTx[j, i] = hCaTinf + (hCaTx[j, i-1] - hCaTinf) * exp(-dt / hCaTtau)
+            hCaTx[j, i] = hCaTinf + (hCaTx[j, i-1] - hCaTinf) * exp(-dt * tau_temp_factor_h[1] / hCaTtau)
 
             hCaSinf = mhtt(Vx[j, i-1], ICaSdata[3], ICaSdata[4])
             hCaStau = ICaSdata[11] + ICaSdata[12] * mhtt2(Vx[j, i-1], ICaSdata[13], ICaSdata[14], ICaSdata[15], ICaSdata[16])     # ms
-            hCaSx[j, i] = hCaSinf + (hCaSx[j, i-1] - hCaSinf) * exp(-dt / hCaStau)
+            hCaSx[j, i] = hCaSinf + (hCaSx[j, i-1] - hCaSinf) * exp(-dt * tau_temp_factor_h[2] / hCaStau)
 
             hAinf = mhtt(Vx[j, i-1], IAdata[3], IAdata[4])
             hAtau = IAdata[11] + IAdata[12] * mhtt(Vx[j, i-1], IAdata[13], IAdata[14])                # ms
-            hAx[j, i] = hAinf + (hAx[j, i-1] - hAinf) * exp(-dt / hAtau)
+            hAx[j, i] = hAinf + (hAx[j, i-1] - hAinf) * exp(-dt * tau_temp_factor_h[3] / hAtau)
 
         for k in range(m):
             # Rewritten to avoid overflow under standard conditions
             npre = int(conns[k,1])
             e = exp((Vth - Vx[npre, i-1]) / Delta)
             sinf = 1 / (1 + e)
-            stau =  conns[k,4] * (1 - sinf)     # 1 / ms^-1 = ms
+            stau =  conns[k,4] * (1 - sinf) / tau_temp_factor_conns[k]     # 1 / ms^-1 = ms
 
-            #sx[k, i] = sinf + (sx[k, i-1] - sinf) * exp(-dt / stau)  # ms / ms = 1
             sx[k, i] = sx[k, i-1] + (sinf - sx[k, i-1]) * dt / stau  # ms / ms = 1
             if dt > stau:
                 sx[k, i] = sinf
 
-    ret = {'Vs': Vx, 'Cas': Cax, 'ICas': ICax, 'logs': logs, 'energy': energy_over_time}
+    membrane_conds = np.asarray([cond_na, cond_cat, cond_cas, cond_a,
+                                       cond_kca, cond_kd, cond_h, cond_leak])
+    membrane_conds = np.transpose(membrane_conds, (1,0,2))
+    ret = {
+        'Vs': Vx,
+        'Cas': Cax,
+        'ICas': ICax,
+        'logs': logs,
+        'energy': energy_over_time,
+        'membrane_conds': membrane_conds,
+        'synaptic_conds': cond_syn,
+        'reversal_calcium': reversal_calcium,
+    }
     return ret
