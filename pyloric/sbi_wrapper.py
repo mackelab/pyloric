@@ -86,7 +86,6 @@ def simulate(
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
         ],
-        "proctolin_gbar": False,
         "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
         "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
         "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
@@ -102,7 +101,6 @@ def simulate(
             ["LP", "LP_3", 0.628e-3],
             ["PY", "PY_4", 0.628e-3],
         ],
-        "proctolin_gbar": [0.0, 0.0, 0.0],
         "Q10_gbar_syn": [1.5, 1.5],
         "Q10_tau_syn": [1.7, 1.7],
         "Q10_gbar_mem": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
@@ -115,7 +113,6 @@ def simulate(
     t = np.arange(0, tmax, dt)
 
     neurons = create_neurons(defaults_dict["membrane_gbar"])
-    proctolin = np.asarray(defaults_dict["proctolin_gbar"])
 
     # define lists to loop over to assemble the parameters
     param_classes = [
@@ -195,13 +192,6 @@ def simulate(
                 current_num += 1
             else:
                 membrane_cond.append(neurons[neuron_num][cond_num])
-        if setup_dict["proctolin_gbar"]:
-            membrane_cond.append(membrane_conductances[current_num])
-            current_num += 1
-        else:
-            membrane_cond.append(
-                proctolin[neuron_num]
-            )  # proctolin is made part of the membrane conds here.
         membrane_conds.append(np.asarray(membrane_cond))
 
     if isinstance(split_parameters[5], float):

@@ -83,7 +83,6 @@ def sim_time(
     cdef np.ndarray[dtype] IKCadata    = np.asarray([ 4   , 28.3  , -12.6 , Nval  , Nval  , 180.6 , -150.2, 46    , -22.7 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IKddata     = np.asarray([ 4   , 12.3  , -11.8 , Nval  , Nval  , 14.4  , -12.8 , 28.3  , -19.2 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IHdata      = np.asarray([ 1   , 75    , 5.5   , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
-    cdef np.ndarray[dtype] IProcdata   = np.asarray([ 1   , 12    , -3.05 , Nval  , Nval  , 0.5   , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
 
     cdef dtype Esglut = -70
     cdef dtype kminusglut = 40
@@ -134,7 +133,6 @@ def sim_time(
     cdef np.ndarray[dtype] gKdx    = modelx.T[5] * g_temp_factor_memb[5]
     cdef np.ndarray[dtype] gHx     = modelx.T[6] * g_temp_factor_memb[6]
     cdef np.ndarray[dtype] gleakx  = modelx.T[7] * g_temp_factor_memb[7]
-    cdef np.ndarray[dtype] gProcx  = modelx.T[8] * g_temp_factor_memb[0] # proctolin is last membrane cond.
 
     # Constants
     cdef dtype C = 0.6283e-3
@@ -143,7 +141,6 @@ def sim_time(
     cdef dtype EK = -80
     cdef dtype EH = -20
     cdef dtype Eleak = -50
-    cdef dtype EProc = 0.0
 
     cdef dtype Catau = 200
     cdef dtype f = 14961
@@ -177,7 +174,6 @@ def sim_time(
     cdef np.ndarray[dtype, ndim=2] mKCax   = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] mKdx    = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] mHx     = np.empty_like(Ix)
-    cdef np.ndarray[dtype, ndim=2] mProcx  = np.empty_like(Ix)
 
     cdef np.ndarray[dtype, ndim=2] hNax    = np.empty_like(Ix)
     cdef np.ndarray[dtype, ndim=2] hCaTx   = np.empty_like(Ix)
@@ -197,7 +193,6 @@ def sim_time(
     cdef np.ndarray[dtype] cKdx = np.zeros(n)           # mS
     cdef np.ndarray[dtype] cHx = np.zeros(n)            # mS
     cdef np.ndarray[dtype] cleakx = np.zeros(n)         # mS
-    cdef np.ndarray[dtype] cProcx = np.zeros(n)         # mS
 
     # Synapse state variables
     cdef np.ndarray[dtype] csx      = np.empty(m)
@@ -213,7 +208,6 @@ def sim_time(
     cdef dtype mKCatau, mKCainf
     cdef dtype mKdtau, mKdinf
     cdef dtype mHtau, mHinf
-    cdef dtype mProctau, mProcinf
 
     cdef dtype hNatau, hNainf
     cdef dtype hCaTtau, hCaTinf
@@ -258,7 +252,6 @@ def sim_time(
                 mKCainf = (Cax[j, 0] / (Cax[j, 0] + 3)) * mhtt(Vx[j, 0], IKCadata[1], IKCadata[2])
                 mKdinf = mhtt(Vx[j, 0], IKddata[1], IKddata[2])
                 mHinf = mhtt(Vx[j, 0], IHdata[1], IHdata[2])
-                mProcinf = mhtt(Vx[j, 0], IProcdata[1], IProcdata[2])
                 hNainf = mhtt(Vx[j, 0], INadata[3], INadata[4])
                 hCaTinf = mhtt(Vx[j, 0], ICaTdata[3], ICaTdata[4])
                 hCaSinf = mhtt(Vx[j, 0], ICaSdata[3], ICaSdata[4])
@@ -273,7 +266,6 @@ def sim_time(
                 mKCax[j, 0] = mKCainf
                 mKdx[j, 0] = mKdinf
                 mHx[j, 0] = mHinf
-                mProcx[j, 0] = mProcinf
 
                 hNax[j, 0] = hNainf
                 hCaTx[j, 0] = hCaTinf
@@ -294,7 +286,6 @@ def sim_time(
                 mKCax[j, 0] = start_val
                 mKdx[j, 0] = start_val
                 mHx[j, 0] = start_val
-                mProcx[j, 0] = start_val
                 hNax[j, 0] = start_val
                 hCaTx[j, 0] = start_val
                 hCaSx[j, 0] = start_val
@@ -315,7 +306,6 @@ def sim_time(
             mKCax[i, 0] = data[6]
             mKdx[i, 0] = data[7]
             mHx[i, 0] = data[8]
-            mProcx[i, 0] = data[9]
 
             hNax[i, 0] = data[10]
             hCaTx[i, 0] = data[11]
@@ -380,7 +370,6 @@ def sim_time(
             cKdx[j] = gKdx[j] * (mKdx[j, i - 1] ** IKddata[0])                          # mS
             cHx[j] = gHx[j] * (mHx[j, i - 1] ** IHdata[0])                              # mS
             cleakx[j] = gleakx[j]                                                       # mS
-            cProcx[j] = gProcx[j] * (mProcx[j, i - 1] ** IProcdata[0])                  # mS
 
             # store energy in vector
             if i < num_energy_timesteps:
@@ -418,9 +407,9 @@ def sim_time(
             Cainf = Ca0 - f * ICax[j, i]  # (muM / muA) * muA = muM
             Cax[j, i] = Cainf + (Cax[j, i-1] - Cainf) * exp(-dt * tau_temp_factor_CaBuff[0] / Catau)  # muM; Exponent: ms / ms = 1
 
-            Vcoeff = csx[j] + cNax[j] + cCaTx[j] + cCaSx[j] + cAx[j] + cKCax[j] + cKdx[j] + cHx[j] + cleakx[j] + cProcx[j] # mS
+            Vcoeff = csx[j] + cNax[j] + cCaTx[j] + cCaSx[j] + cAx[j] + cKCax[j] + cKdx[j] + cHx[j] + cleakx[j] # mS
             Vinf_ = Icsx[j] + cNax[j] * ENa + cCaTx[j] * ECax[j] + cCaSx[j] * ECax[j] + cAx[j] * EK + cKCax[j] * EK + cKdx[j] *\
-                    EK + cHx[j] * EH + cleakx[j] * Eleak + cProcx[j] * EProc + Ix[j, i]
+                    EK + cHx[j] * EH + cleakx[j] * Eleak + Ix[j, i]
             if Vcoeff == 0:
                 Vx[j, i] = Vx[j, i-1] + dt * Vinf_ / C
             else:
@@ -459,10 +448,6 @@ def sim_time(
             mHinf = mhtt(Vx[j, i-1], IHdata[1], IHdata[2])
             mHtau = getIHtaum(Vx[j, i-1])
             mHx[j, i] = mHinf + (mHx[j, i-1] - mHinf) * exp(-dt * tau_temp_factor_m[6] / mHtau)
-
-            mProcinf = mhtt(Vx[j, i-1], IProcdata[1], IProcdata[2])
-            mProctau = IProcdata[5] # ms
-            mProcx[j, i] = mProcinf + (mProcx[j, i-1] - mProcinf) * exp(-dt * tau_temp_factor_m[7] / mProctau)
 
             hNainf = mhtt(Vx[j, i-1], INadata[3], INadata[4])
             hNatau = getINatauh(Vx[j, i-1])                   # ms
