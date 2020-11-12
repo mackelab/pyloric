@@ -13,12 +13,11 @@ pyximport.install(
     language_level=3,
 )
 
-from pyloric.sbi_simulator import sim_time
+from pyloric.simulator import sim_time
 from pyloric.summary_statistics import PrinzStats
 from pyloric.utils import build_conns, create_neurons
 
 dirname = os.path.dirname(__file__)
-neumodels = ParameterSet(dirname + "/models.prm")
 setups_dict = ParameterSet(dirname + "/setups.prm")
 
 
@@ -46,8 +45,8 @@ def simulate(
         dt: Step size in milliseconds.
         t_max: Overall runtime of the simulation in milliseconds.
         temperature: Temperature in Kelvin that the simulation is run at.
-        noise_std: Standard deviation of the noise added at every time step. Will not
-            be rescaled with the step-size.
+        noise_std: Standard deviation of the noise added at every time step. Will
+            **not** be rescaled with the step-size.
         track_energy: Whether to keep track of and return the energy consumption at any
             step during the simulation. The output dictionary will have the additional
             entry 'energy'.
@@ -235,3 +234,7 @@ def stats(full_data, t_burnin, t_max):
 
     ss = stats_object.calc([full_data])[0]
     return ss
+
+
+def load_setup(name):
+    return setups_dict[name]
