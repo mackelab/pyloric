@@ -108,7 +108,7 @@ def simulate(
 
     neurons = create_neurons(defaults_dict["membrane_gbar"])
 
-    circuit_parameters = circuit_parameters.to_numpy()[0]
+    circuit_parameters = circuit_parameters.to_numpy()
 
     # define lists to loop over to assemble the parameters
     param_classes = [
