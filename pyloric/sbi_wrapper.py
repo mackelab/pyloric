@@ -5,6 +5,8 @@ import os
 from typing import Optional, Dict
 import pyximport
 import numpy
+import pandas as pd
+from copy import deepcopy
 
 # setup_args needed on my MacOS
 pyximport.install(
@@ -15,7 +17,13 @@ pyximport.install(
 
 from pyloric.simulator import sim_time
 from pyloric.summary_statistics import PrinzStats
-from pyloric.utils import build_conns, create_neurons
+from pyloric.utils import (
+    build_conns,
+    create_neurons,
+    select_names,
+    dict_to_numerical,
+    ensure_array_not_scalar,
+)
 
 dirname = os.path.dirname(__file__)
 setups_dict = ParameterSet(dirname + "/setups.prm")
@@ -49,7 +57,7 @@ def simulate(
             **not** be rescaled with the step-size.
         track_energy: Whether to keep track of and return the energy consumption at any
             step during the simulation. The output dictionary will have the additional
-            entry 'energy'.
+            entry `energy`.
         track_currents: Tracks the conductance values of all channels (also synapses).
             The currents can easily be computed from the conductance values by
             $I = g \cdot (V-E)$. For the calcium channels, the reversal potential of
@@ -100,22 +108,24 @@ def simulate(
 
     neurons = create_neurons(defaults_dict["membrane_gbar"])
 
+    circuit_parameters = circuit_parameters.to_numpy()[0]
+
     # define lists to loop over to assemble the parameters
     param_classes = [
-        setup_dict["Q10_gbar_syn"],
-        setup_dict["Q10_tau_syn"],
         setup_dict["Q10_gbar_mem"],
+        setup_dict["Q10_gbar_syn"],
         setup_dict["Q10_tau_m"],
         setup_dict["Q10_tau_h"],
         setup_dict["Q10_tau_CaBuff"],
+        setup_dict["Q10_tau_syn"],
     ]
     class_defaults = [
-        defaults_dict["Q10_gbar_syn"],
-        defaults_dict["Q10_tau_syn"],
         defaults_dict["Q10_gbar_mem"],
+        defaults_dict["Q10_gbar_syn"],
         defaults_dict["Q10_tau_m"],
         defaults_dict["Q10_tau_h"],
         defaults_dict["Q10_tau_CaBuff"],
+        defaults_dict["Q10_tau_syn"],
     ]
     param_classes.reverse()
     class_defaults.reverse()

@@ -26,7 +26,6 @@ cdef dtype getIHtaum(dtype V):
     return 2.0 / (exp(-14.59 - 0.086 * V) + exp(-1.87 + 0.0701 * V))
 
 
-
 @cython.cdivision(True)
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function

@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 
 from sbi.utils import BoxUniform
+from pyloric.utils import select_names, ensure_array_not_scalar
 
 
 def create_prior(
@@ -49,7 +50,7 @@ def create_prior(
     }
     setups.update(customization)
     for key in setups.keys():
-        setups[key] = _ensure_array_not_scalar(setups[key])
+        setups[key] = ensure_array_not_scalar(setups[key])
 
     l_bound, u_bound = prior_bounds(setups, synapses_log_space=synapses_log_space)
     if lower_bound is None:
@@ -142,40 +143,6 @@ def prior_bounds(
     return l_bound, u_bound
 
 
-def select_names(setup: Dict) -> Tuple[List, np.ndarray]:
-    """
-    Returns the names of all parameters that are selected in the `setup` dictionary.
-    """
-    gbar = np.asarray([_channel_names()[c] for c in setup["membrane_gbar"]]).flatten()
-    syn = _synapse_names()
-    q10_mem_gbar = _q10_mem_gbar_names()[setup["Q10_gbar_mem"]]
-    q10_syn_gbar = _q10_syn_gbar_names()[setup["Q10_gbar_syn"]]
-    tau_setups = np.concatenate(
-        (
-            setup["Q10_tau_m"],
-            setup["Q10_tau_h"],
-            setup["Q10_tau_CaBuff"],
-            setup["Q10_tau_syn"],
-        )
-    )
-    q10_tau = _q10_tau_names()[tau_setups]
-
-    type_names = ["AB/PD"] * sum(setup["membrane_gbar"][0])
-    type_names += ["LP"] * sum(setup["membrane_gbar"][1])
-    type_names += ["PY"] * sum(setup["membrane_gbar"][2])
-    type_names += ["Synapses"] * 7
-    type_names += ["Q10 gbar"] * (
-        sum(setup["Q10_gbar_mem"]) + sum(setup["Q10_gbar_syn"])
-    )
-    type_names += ["Q10 tau"] * (
-        sum(setup["Q10_tau_m"])
-        + sum(setup["Q10_tau_h"])
-        + sum(setup["Q10_tau_CaBuff"])
-        + sum(setup["Q10_tau_syn"])
-    )
-    return type_names, np.concatenate((gbar, syn, q10_mem_gbar, q10_syn_gbar, q10_tau))
-
-
 def _get_min_max_membrane_gbar(selector: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Returns the lower and upper bound of the maximal membrane conductances.
@@ -246,29 +213,3 @@ def _select(minimum_val, maximum_val, selector):
     selected_min_vals = min_vals[selector].flatten()
     selected_max_vals = max_vals[selector].flatten()
     return selected_min_vals, selected_max_vals
-
-
-def _ensure_array_not_scalar(selector):
-    if isinstance(selector, bool):
-        selector = np.asarray([selector])
-    return np.asarray(selector)
-
-
-def _channel_names():
-    return np.asarray(["Na", "CaT", "CaS", "A", "KCa", "Kd", "H", "Leak"])
-
-
-def _synapse_names():
-    return np.asarray(["AB-LP", "PD-LP", "AB-PY", "PD-PY", "LP-PD", "LP-PY", "PY-LP"])
-
-
-def _q10_mem_gbar_names():
-    return np.asarray(["Na", "CaT", "CaS", "A", "KCa", "Kd", "H", "Leak"])
-
-
-def _q10_syn_gbar_names():
-    return np.asarray(["Glut", "Chol"])
-
-
-def _q10_tau_names():
-    return np.asarray(["m", "h", "CaBuff", "Glut", "Chol"])

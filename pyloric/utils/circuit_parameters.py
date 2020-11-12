@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Dict, Tuple, Optional, List
 
 
 def create_neurons(neuron_list):
@@ -35,7 +36,7 @@ def create_neurons(neuron_list):
     for n in neuron_list:
         neuron = np.asarray(prinz_neurons[n[0]][n[1]]) * n[2]
         ret.append(neuron)
-    return ret
+    return np.asarray(ret)
 
 
 def build_conns(params):
@@ -59,3 +60,63 @@ def build_conns(params):
             [1, 2, params[6], Esglut, kminusglut],
         ]
     )
+
+
+def ensure_array_not_scalar(selector):
+    if isinstance(selector, bool) or isinstance(selector, float):
+        selector = np.asarray([selector])
+    return np.asarray(selector)
+
+
+def select_names(setup: Dict) -> Tuple[List, np.ndarray]:
+    """
+    Returns the names of all parameters that are selected in the `setup` dictionary.
+    """
+    gbar = np.asarray([_channel_names()[c] for c in setup["membrane_gbar"]]).flatten()
+    syn = _synapse_names()
+    q10_mem_gbar = _q10_mem_gbar_names()[setup["Q10_gbar_mem"]]
+    q10_syn_gbar = _q10_syn_gbar_names()[setup["Q10_gbar_syn"]]
+    tau_setups = np.concatenate(
+        (
+            setup["Q10_tau_m"],
+            setup["Q10_tau_h"],
+            setup["Q10_tau_CaBuff"],
+            setup["Q10_tau_syn"],
+        )
+    )
+    q10_tau = _q10_tau_names()[tau_setups]
+
+    type_names = ["AB/PD"] * sum(setup["membrane_gbar"][0])
+    type_names += ["LP"] * sum(setup["membrane_gbar"][1])
+    type_names += ["PY"] * sum(setup["membrane_gbar"][2])
+    type_names += ["Synapses"] * 7
+    type_names += ["Q10 gbar"] * (
+        sum(setup["Q10_gbar_mem"]) + sum(setup["Q10_gbar_syn"])
+    )
+    type_names += ["Q10 tau"] * (
+        sum(setup["Q10_tau_m"])
+        + sum(setup["Q10_tau_h"])
+        + sum(setup["Q10_tau_CaBuff"])
+        + sum(setup["Q10_tau_syn"])
+    )
+    return type_names, np.concatenate((gbar, syn, q10_mem_gbar, q10_syn_gbar, q10_tau))
+
+
+def _channel_names():
+    return np.asarray(["Na", "CaT", "CaS", "A", "KCa", "Kd", "H", "Leak"])
+
+
+def _synapse_names():
+    return np.asarray(["AB-LP", "PD-LP", "AB-PY", "PD-PY", "LP-PD", "LP-PY", "PY-LP"])
+
+
+def _q10_mem_gbar_names():
+    return np.asarray(["Na", "CaT", "CaS", "A", "KCa", "Kd", "H", "Leak"])
+
+
+def _q10_syn_gbar_names():
+    return np.asarray(["Glut", "Chol"])
+
+
+def _q10_tau_names():
+    return np.asarray(["m", "h", "CaBuff", "Glut", "Chol"])
