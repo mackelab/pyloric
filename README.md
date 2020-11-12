@@ -19,7 +19,7 @@ simulation_output = simulate(parameter_set[0])
 ```
 
 ### Flexible simulator
-For having more flexibility with the simulator (e.g. add Q10 values, different temperature, proctolin (warninig: untested!), or only a subset of membrane conductances), we also provide a more flexible interface. Use it as follows:
+For having more flexibility with the simulator (e.g. add Q10 values, different temperature, or only a subset of membrane conductances), we also provide a more flexible interface. Use it as follows:
 ```
 from parameters import ParameterSet
 from pyloric import create_prior_general, simulate_general
