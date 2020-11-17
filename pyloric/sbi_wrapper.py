@@ -21,7 +21,6 @@ from pyloric.utils import (
     build_conns,
     create_neurons,
     select_names,
-    dict_to_numerical,
     ensure_array_not_scalar,
 )
 
