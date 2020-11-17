@@ -70,6 +70,8 @@ def create_prior(
 
         def sample(self, sample_shape):
             numerical_sample = self.numerical_prior.sample(sample_shape).numpy()
+            print("self.names", self.names)
+            print("numerical_sample", numerical_sample)
             return pd.DataFrame(numerical_sample, columns=self.names)
 
         def log_prob(self, theta):

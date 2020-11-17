@@ -3,7 +3,7 @@ import scipy
 import scipy.stats
 import scipy.signal
 from copy import deepcopy
-
+import pandas as pd
 import os
 
 
@@ -107,20 +107,16 @@ import os
 
 class PrinzStats:
     def __init__(
-        self,
-        t_on,
-        t_off,
-        include_pyloric_ness=True,
-        include_plateaus=False,
-        seed=None,
-        energy=False,
+        self, setup, t_on, t_off, dt,
     ):
         """See SummaryStats.py for docstring"""
+        self.setup = setup
         self.t_on = t_on
         self.t_off = t_off
-        self.include_pyloric_ness = include_pyloric_ness
-        self.include_plateaus = include_plateaus
-        self.energy = energy
+        self.dt = dt
+        self.include_pyloric_ness = self.setup["pyloric_like"]
+        self.include_plateaus = self.setup["plateau_durations"]
+        self.energy = self.setup["energies"]
 
         neutypes = ["PM", "LP", "PY"]
 
@@ -144,24 +140,24 @@ class PrinzStats:
         )
 
         if self.include_plateaus:
-            self.labels += ["plateau_lengths_{}".format(nt) for nt in neutypes]
+            self.labels += ["plateau_durations_{}".format(nt) for nt in neutypes]
         if self.include_pyloric_ness:
             self.labels += ["pyloric_like"]
         if self.energy:
-            self.labels += ["energy_{}".format(nt) for nt in neutypes]
+            self.labels += ["energies_per_spike_{}".format(nt) for nt in neutypes]
             self.labels += ["num_bursts_{}".format(nt) for nt in neutypes]
-            self.labels += ["energy_per_burst_{}".format(nt) for nt in neutypes]
-            self.labels += ["total_energy_{}".format(nt) for nt in neutypes]
+            self.labels += ["energies_per_burst_{}".format(nt) for nt in neutypes]
+            self.labels += ["energies_{}".format(nt) for nt in neutypes]
 
         self.labels += ["num_spikes_{}".format(nt) for nt in neutypes]
         # self.labels += ['spike_times_{}'.format(nt) for nt in neutypes]
         # self.labels += ['spike_heights_{}'.format(nt) for nt in neutypes]
         # self.labels += ['rebound_times_{}'.format(nt) for nt in neutypes]
 
-        self.labels += ["voltage_mean_{}".format(nt) for nt in neutypes]
-        self.labels += ["voltage_std_{}".format(nt) for nt in neutypes]
-        self.labels += ["voltage_skew_{}".format(nt) for nt in neutypes]
-        self.labels += ["voltage_kurtosis_{}".format(nt) for nt in neutypes]
+        self.labels += ["voltage_means_{}".format(nt) for nt in neutypes]
+        self.labels += ["voltage_stds_{}".format(nt) for nt in neutypes]
+        self.labels += ["voltage_skews_{}".format(nt) for nt in neutypes]
+        self.labels += ["voltage_kurtoses_{}".format(nt) for nt in neutypes]
 
         self.n_summary = len(self.labels)
 
@@ -170,286 +166,94 @@ class PrinzStats:
         # does not make use of last element summ['pyloric_like']
         ret = []
 
-        for r in range(len(repetition_list)):
-            x = repetition_list[r]
+        x = repetition_list
 
-            tmax = x["tmax"]
-            dt = x["dt"]
-            t_on = min(self.t_on, tmax)
-            t_off = min(self.t_off, tmax)
+        tmax = self.t_off
+        dt = self.dt
+        t_on = self.t_on
+        t_off = self.t_off
 
-            Vx = x["data"]
-            Vx = Vx[:, int(t_on / dt) : int(t_off / dt)]
+        Vx = x["voltage"]
+        Vx = Vx[:, int(t_on / dt) : int(t_off / dt)]
 
-            try:
-                energy = x["energy"]
-                energy = energy[:, int(t_on / dt) : int(t_off / dt)]
-            except:
-                energy = np.zeros_like(Vx)
+        try:
+            energy = x["energy"]
+            energy = energy[:, int(t_on / dt) : int(t_off / dt)]
+        except:
+            energy = np.zeros_like(Vx)
 
-            # retreive summary statistics stored in a dictionary
-            summ = self.calc_summ_stats(Vx, energy, tmax, dt, self.include_pyloric_ness)
+        # retreive summary statistics stored in a dictionary
+        summ = self.calc_summ_stats(Vx, energy, tmax, dt, self.include_pyloric_ness)
 
-            keys = [
-                "cycle_period",
-                "burst_durations",
-                "duty_cycles",
-                "start_phases",
-                "starts_to_starts",
-                "ends_to_starts",
-                "phase_gaps",
-                "plateau_lengths",
-                "pyloric_like",
-                "energy",
-                "num_bursts",
-                "energy_per_burst",
-                "total_energy",
-                "num_spikes",
-                "voltage_mean",
-                "voltage_std",
-                "voltage_skew",
-                "voltage_kurtosis",
-                "spike_times",
-                "spike_heights",
-                "rebound_times",
-            ]
-            new_dict = {}
-            for key in keys:
-                new_dict[key] = summ[key]
-            ret.append(new_dict)
+        keys = [
+            "cycle_period",
+            "burst_durations",
+            "duty_cycles",
+            "start_phases",
+            "starts_to_starts",
+            "ends_to_starts",
+            "phase_gaps",
+            "plateau_durations",
+            "energies_per_spike",
+            "num_bursts",
+            "energies_per_burst",
+            "energies",
+            "num_spikes",
+            "voltage_means",
+            "voltage_stds",
+            "voltage_skews",
+            "voltage_kurtoses",
+            "spike_times",
+            "spike_heights",
+            "rebound_times",
+        ]
 
-        return ret
+        if self.include_pyloric_ness:
+            keys.append("pyloric_like")
 
-    def calc(self, repetition_list):
-
+        new_dict = {}
         neutypes = ["PM", "LP", "PY"]
+        general_names = []
+        specific_names = []
+        all_data = []
 
-        # does not make use of last element summ['pyloric_like']
-        ret = np.empty((len(repetition_list), self.n_summary))
-
-        for r in range(len(repetition_list)):
-            x = repetition_list[r]
-
-            tmax = x["tmax"]
-            dt = x["dt"]
-            t_on = min(self.t_on, tmax)
-            t_off = min(self.t_off, tmax)
-
-            Vx = x["data"]
-            Vx = Vx[:, int(t_on / dt) : int(t_off / dt)]
-
-            try:
-                energy = x["energy"]
-                energy = energy[:, int(t_on / dt) : int(t_off / dt)]
-            except:
-                energy = np.zeros_like(Vx)
-
-            # retreive summary statistics stored in a dictionary
-            summ = self.calc_summ_stats(Vx, energy, tmax, dt, self.include_pyloric_ness)
-
-            # create array of summary statistics using the data from the dictionary
-            duty_cycles = [summ["duty_cycles"][nt] for nt in neutypes]
-            burst_lengths = [summ[nt]["avg_burst_length"] for nt in neutypes]
-
-            gaps = [
-                summ["ends_to_starts"][neutypes[i], neutypes[j]]
-                for i, j in ((0, 1), (1, 2))
-            ]
-            delays = [
-                summ["starts_to_starts"][neutypes[i], neutypes[j]]
-                for i, j in ((0, 1), (0, 2))
-            ]
-
-            phase_gaps = [
-                summ["phase_gaps"][neutypes[i], neutypes[j]]
-                for i, j in ((0, 1), (1, 2))
-            ]
-            phases = [summ["start_phases"][neutypes[i]] for i in (1, 2)]
-
-            plateau_lengths = [summ["plateau_lengths"][nt] for nt in neutypes]
-            energy = [summ["energy"][nt] for nt in neutypes]
-
-            num_bursts = [summ["num_bursts"][nt] for nt in neutypes]
-            energy_per_burst = [summ["energy_per_burst"][nt] for nt in neutypes]
-            total_energy = [summ["total_energy"][nt] for nt in neutypes]
-
-            num_spikes = [summ["num_spikes"][nt] for nt in neutypes]
-            # spike_times = [summ['spike_times'][nt] for nt in neutypes]
-            # spike_heights = [summ['spike_heights'][nt] for nt in neutypes]
-            # rebound_times = [summ['rebound_times'][nt] for nt in neutypes]
-
-            voltage_mean = [summ["voltage_mean"][nt] for nt in neutypes]
-            voltage_std = [summ["voltage_std"][nt] for nt in neutypes]
-            voltage_skew = [summ["voltage_skew"][nt] for nt in neutypes]
-            voltage_kurtosis = [summ["voltage_kurtosis"][nt] for nt in neutypes]
-
-            if self.energy:
-                if self.include_pyloric_ness and self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *plateau_lengths,
-                            summ["pyloric_like"],
-                            *energy,
-                            *num_bursts,
-                            *energy_per_burst,
-                            *total_energy,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
+        for key in keys:
+            if self.setup[key]:
+                new_dict[key] = summ[key]
+                if isinstance(summ[key], float):
+                    general_names += [key]
+                    specific_names += ["Circuit"]
+                    all_data += [summ[key]]
+                else:
+                    if key in [
+                        "ends_to_starts",
+                        "starts_to_starts",
+                        "phase_gaps",
+                    ]:
+                        all_data += [
+                            summ[key][neutypes[i], neutypes[j]]
+                            for i, j in ((0, 1), (1, 2))
                         ]
-                    )
-                if self.include_pyloric_ness and not self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            summ["pyloric_like"],
-                            *energy,
-                            *num_bursts,
-                            *energy_per_burst,
-                            *total_energy,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-                if not self.include_pyloric_ness and self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *plateau_lengths,
-                            *energy,
-                            *num_bursts,
-                            *energy_per_burst,
-                            *total_energy,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-                if not self.include_pyloric_ness and not self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *energy,
-                            *num_bursts,
-                            *energy_per_burst,
-                            *total_energy,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-            else:
-                if self.include_pyloric_ness and self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *plateau_lengths,
-                            summ["pyloric_like"],
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-                if self.include_pyloric_ness and not self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            summ["pyloric_like"],
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-                if not self.include_pyloric_ness and self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *plateau_lengths,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
-                if not self.include_pyloric_ness and not self.include_plateaus:
-                    ret[r] = np.asarray(
-                        [
-                            summ["cycle_period"],
-                            *burst_lengths,
-                            *gaps,
-                            *delays,
-                            *duty_cycles,
-                            *phase_gaps,
-                            *phases,
-                            *num_spikes,
-                            *voltage_mean,
-                            *voltage_std,
-                            *voltage_skew,
-                            *voltage_kurtosis,
-                        ]
-                    )
+                        general_names += [key] * 2
+                        specific_names += ["AB/PD - LP", "LP - PY"]
+                    elif key == "start_phases":
+                        all_data += [summ[key][neutypes[i]] for i in (1, 2)]
+                        general_names += [key] * 2
+                        specific_names += ["LP", "PY"]
+                    else:
+                        for specific_name in summ[key].keys():
+                            general_names += [key]
+                            specific_names += [specific_name]
+                            all_data += [summ[key][specific_name]]
 
-            # impute unreasonably large values for NaNs (comment out if you want SNPE to impute values)
-            # summ_stats[np.isnan(summ_stats)] = 1e6
+        all_data = np.asarray(all_data)
+        general_names = np.asarray(general_names)
+        specific_names = np.asarray(specific_names)
 
-        return ret
+        pd_ret = pd.DataFrame(
+            np.asarray([all_data]), columns=[general_names, specific_names]
+        )
+        return pd_ret
 
     # Analyse voltage trace of a single neuron
     def analyse_neuron(self, t, V_original, energy):
@@ -520,7 +324,7 @@ class PrinzStats:
             num_bursts = 0
             energy_per_burst = 0
 
-            plateau_lengths = NaN
+            plateau_durations = NaN
             avg_burst_length = NaN
             avg_ibi_length = NaN
             avg_cycle_length = NaN
@@ -625,10 +429,10 @@ class PrinzStats:
                         current = 0
                 running_ind += 1
                 longest_list.append(longest * stepping)
-            plateau_lengths = np.mean(longest_list)
-            if plateau_lengths < 200:
-                plateau_lengths = 100  # make sure that the duration of a single spike is not a feature
-            plateau_lengths *= t[1] - t[0]  # convert to ms
+            plateau_durations = np.mean(longest_list)
+            if plateau_durations < 200:
+                plateau_durations = 100  # make sure that the duration of a single spike is not a feature
+            plateau_durations *= t[1] - t[0]  # convert to ms
 
             avg_burst_length = np.average(burst_lengths)
 
@@ -674,7 +478,7 @@ class PrinzStats:
         # avg_burst_length = 1.1
         # avg_cycle_length = 1.1
         # avg_ibi_length = 1.1
-        # plateau_lengths = 1.1
+        # plateau_durations = 1.1
         # mean_energy_per_spike_in_all_bursts = 1.1
         # num_bursts = 5
         # energy_per_burst = 1.1
@@ -698,16 +502,16 @@ class PrinzStats:
             "avg_burst_length": avg_burst_length,
             "avg_cycle_length": avg_cycle_length,
             "avg_ibi_length": avg_ibi_length,
-            "plateau_lengths": plateau_lengths,
-            "energy": mean_energy_per_spike_in_all_bursts,
+            "plateau_durations": plateau_durations,
+            "energies_per_spike": mean_energy_per_spike_in_all_bursts,
             "num_bursts": num_bursts,
-            "energy_per_burst": energy_per_burst,
-            "total_energy": total_energy,
+            "energies_per_burst": energy_per_burst,
+            "energies": total_energy,
             "spike_heights": spike_heights,
-            "voltage_mean": voltage_mean,
-            "voltage_std": voltage_std,
-            "voltage_skew": voltage_skew,
-            "voltage_kurtosis": voltage_kurtosis,
+            "voltage_means": voltage_mean,
+            "voltage_stds": voltage_std,
+            "voltage_skews": voltage_skew,
+            "voltage_kurtoses": voltage_kurtosis,
         }
 
     def calc_dummy(self):
@@ -792,9 +596,9 @@ class PrinzStats:
             else:
                 triphasic = False
 
-        # plateau_lengths = []
+        # plateau_durations = []
         # for nt in neutypes:
-        #    plateau_lengths.append(stats[nt]["plateau_lengths"])
+        #    plateau_durations.append(stats[nt]["plateau_durations"])
 
         stats.update(
             {
@@ -825,7 +629,7 @@ class PrinzStats:
         starts_to_starts = {}
         ends_to_starts = {}
         phase_gaps = {}
-        plateau_lengths = {}
+        plateau_durations = {}
         energy = {}
         num_bursts = {}
         energy_per_burst = {}
@@ -842,19 +646,19 @@ class PrinzStats:
         for nt in neutypes:
             burst_durations[nt] = summ[nt]["avg_burst_length"]
             duty_cycles[nt] = burst_durations[nt] / summ["cycle_period"]
-            plateau_lengths[nt] = summ[nt]["plateau_lengths"]
-            energy[nt] = summ[nt]["energy"]
+            plateau_durations[nt] = summ[nt]["plateau_durations"]
+            energy[nt] = summ[nt]["energies_per_spike"]
             num_bursts[nt] = summ[nt]["num_bursts"]
-            energy_per_burst[nt] = summ[nt]["energy_per_burst"]
-            total_energy[nt] = summ[nt]["total_energy"]
+            energy_per_burst[nt] = summ[nt]["energies_per_burst"]
+            total_energy[nt] = summ[nt]["energies"]
             num_spikes[nt] = summ[nt]["num_spikes"]
             spike_times[nt] = summ[nt]["spike_times"]
             spike_heights[nt] = summ[nt]["spike_heights"]
             rebound_times[nt] = summ[nt]["rebound_times"]
-            voltage_mean[nt] = summ[nt]["voltage_mean"]
-            voltage_std[nt] = summ[nt]["voltage_std"]
-            voltage_skew[nt] = summ[nt]["voltage_skew"]
-            voltage_kurtosis[nt] = summ[nt]["voltage_kurtosis"]
+            voltage_mean[nt] = summ[nt]["voltage_means"]
+            voltage_std[nt] = summ[nt]["voltage_stds"]
+            voltage_skew[nt] = summ[nt]["voltage_skews"]
+            voltage_kurtosis[nt] = summ[nt]["voltage_kurtoses"]
 
             if not summ["triphasic"]:
                 for nt2 in neutypes:
@@ -894,57 +698,34 @@ class PrinzStats:
             and np.mean(np.all(pyloric_analysis <= 0, axis=1)) >= pyloric_thresh
         )
 
+        summ.update(
+            {
+                "cycle_period": summ["cycle_period"],
+                "burst_durations": burst_durations,
+                "duty_cycles": duty_cycles,
+                "start_phases": start_phases,
+                "starts_to_starts": starts_to_starts,
+                "ends_to_starts": ends_to_starts,
+                "phase_gaps": phase_gaps,
+                "plateau_durations": plateau_durations,
+                "pyloric_like": pyloric_like,
+                "energies_per_spike": energy,
+                "num_bursts": num_bursts,
+                "energies_per_burst": energy_per_burst,
+                "energies": total_energy,
+                "num_spikes": num_spikes,
+                "spike_times": spike_times,
+                "spike_heights": spike_heights,
+                "rebound_times": rebound_times,
+                "voltage_means": voltage_mean,
+                "voltage_stds": voltage_std,
+                "voltage_skews": voltage_skew,
+                "voltage_kurtoses": voltage_kurtosis,
+            }
+        )
+
         if include_pyloric_ness:
-            summ.update(
-                {
-                    "cycle_period": summ["cycle_period"],
-                    "burst_durations": burst_durations,
-                    "duty_cycles": duty_cycles,
-                    "start_phases": start_phases,
-                    "starts_to_starts": starts_to_starts,
-                    "ends_to_starts": ends_to_starts,
-                    "phase_gaps": phase_gaps,
-                    "plateau_lengths": plateau_lengths,
-                    "pyloric_like": pyloric_like,
-                    "energy": energy,
-                    "num_bursts": num_bursts,
-                    "energy_per_burst": energy_per_burst,
-                    "total_energy": total_energy,
-                    "num_spikes": num_spikes,
-                    "spike_times": spike_times,
-                    "spike_heights": spike_heights,
-                    "rebound_times": rebound_times,
-                    "voltage_mean": voltage_mean,
-                    "voltage_std": voltage_std,
-                    "voltage_skew": voltage_skew,
-                    "voltage_kurtosis": voltage_kurtosis,
-                }
-            )
-        else:
-            summ.update(
-                {
-                    "cycle_period": summ["cycle_period"],
-                    "burst_durations": burst_durations,
-                    "duty_cycles": duty_cycles,
-                    "start_phases": start_phases,
-                    "starts_to_starts": starts_to_starts,
-                    "ends_to_starts": ends_to_starts,
-                    "phase_gaps": phase_gaps,
-                    "plateau_lengths": plateau_lengths,
-                    "energy": energy,
-                    "num_bursts": num_bursts,
-                    "energy_per_burst": energy_per_burst,
-                    "total_energy": total_energy,
-                    "num_spikes": num_spikes,
-                    "spike_times": spike_times,
-                    "spike_heights": spike_heights,
-                    "rebound_times": rebound_times,
-                    "voltage_mean": voltage_mean,
-                    "voltage_std": voltage_std,
-                    "voltage_skew": voltage_skew,
-                    "voltage_kurtosis": voltage_kurtosis,
-                }
-            )
+            summ.update({"pyloric_like": pyloric_like})
 
         # This is just for plotting purposes, a convenience hack
         for nt in neutypes:

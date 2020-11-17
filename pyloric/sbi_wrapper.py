@@ -1,12 +1,10 @@
 import numpy as np
-from numpy import array
 from parameters import ParameterSet
 import os
 from typing import Optional, Dict
 import pyximport
 import numpy
 import pandas as pd
-from copy import deepcopy
 
 # setup_args needed on my MacOS
 pyximport.install(
@@ -20,8 +18,6 @@ from pyloric.summary_statistics import PrinzStats
 from pyloric.utils import (
     build_conns,
     create_neurons,
-    select_names,
-    ensure_array_not_scalar,
 )
 
 dirname = os.path.dirname(__file__)
@@ -29,7 +25,7 @@ setups_dict = ParameterSet(dirname + "/setups.prm")
 
 
 def simulate(
-    circuit_parameters: array,
+    circuit_parameters: pd.DataFrame,
     dt: float = 0.025,
     t_max: int = 11000,
     temperature: int = 283,
@@ -44,11 +40,8 @@ def simulate(
     Runs the STG model with a subset of all parameters.
 
     Args:
-        circuit_parameters: Parameters of the circuit model. By default, this should be
-            an array of shape (31,). The entries are interpreted as follows:
-            (g_AB/PD, g_LP, g_PY, g_syn). The membrane conductances are ordered as:
-            Na, CaT, CaS, A, KCa, Kd, H, Leak. The seven synapses are ordered as:
-            AB-LP, PD-LP, AB-PY, PD-PY, LP-PD, LP-PY, PY-LP.
+        circuit_parameters: Parameters of the circuit model. This should be a pandas
+            DataFrame sampled from the prior.
         dt: Step size in milliseconds.
         t_max: Overall runtime of the simulation in milliseconds.
         temperature: Temperature in Kelvin that the simulation is run at.
@@ -220,7 +213,7 @@ def simulate(
         verbose=False,
     )
 
-    results_dict = {"voltage": data["Vs"]}
+    results_dict = {"voltage": data["Vs"], "dt": dt, "t_max": t_max}
     if track_energy:
         results_dict.update({"energy": data["energy"]})
     if track_currents:
@@ -231,17 +224,72 @@ def simulate(
     return results_dict
 
 
-def stats(full_data, t_burnin, t_max):
+def stats(
+    simulation_outputs: Dict, stats_customization: Dict = {}, t_burn_in=1000
+) -> pd.DataFrame:
+    """
+    Return summary statistics of the voltage trace.
+
+    Args:
+        simulation_outputs: Dictionary returned by `simulate()`. Contains (at least)
+            the voltage traces, the time step, and the duration of the simulation.
+        stats_customization: Allows to add summary statistics. Possible keys are:
+            `plateau_durations`: Maximum duration of voltage plateaus above -30mV in
+                each model neuron.
+            `pyloric_like`: bool indicating whether the rhythm was pyloric-like (see
+                Prinz 2004 for a definition).
+            `pyloric`: bool indicating whether the rhythm was pyloric (see
+                Prinz 2004 for a definition).
+            `num_bursts`: Integer indicating the number of bursts in each neuron.
+            `num_spikes`: Integer indicating the number of spikes in each neuron.
+            `voltage_moments`: The first four moments (mean, std, skew, kurtosis) of
+                the voltage trace of each neuron.
+            `energies`: The energy (in microJoule) consumed by each neuron.
+            `energies_per_spike`: The average energy per spike (in microJoule) in each
+                neuron.
+        t_burn_in: The time (in milliseconds) that should be excluded from the
+            computation of summary statistics. The idea is that the rhythm should first
+            reach a steady state and only then should one compute the summary
+            statistics.
+
+    Returns:
+        Summary statistics.
+    """
+
+    setups = {
+        "cycle_period": True,
+        "burst_durations": True,
+        "duty_cycles": True,
+        "start_phases": True,
+        "starts_to_starts": True,
+        "ends_to_starts": True,
+        "phase_gaps": True,
+        "plateau_durations": False,
+        "pyloric_like": False,
+        "pyloric": False,
+        "num_bursts": False,
+        "num_spikes": False,
+        "spike_times": False,
+        "spike_heights": False,
+        "rebound_times": False,
+        "voltage_means": False,
+        "voltage_stds": False,
+        "voltage_skews": False,
+        "voltage_kurtoses": False,
+        "energies": False,
+        "energies_per_burst": False,
+        "energies_per_spike": False,
+    }
+    setups.update(stats_customization)
+
     stats_object = PrinzStats(
-        t_on=t_burnin,
-        t_off=t_max,
-        include_pyloric_ness=True,
-        include_plateaus=True,
-        seed=0,
-        energy=True,
+        setup=setups,
+        t_on=t_burn_in,
+        t_off=simulation_outputs["t_max"],
+        dt=simulation_outputs["dt"],
     )
 
-    ss = stats_object.calc([full_data])[0]
+    ss = stats_object.calc_dict(simulation_outputs)
     return ss
 
 
