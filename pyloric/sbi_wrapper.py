@@ -1,5 +1,4 @@
 import numpy as np
-from parameters import ParameterSet
 import os
 from typing import Optional, Dict
 import pyximport
@@ -19,9 +18,6 @@ from pyloric.utils import (
     build_conns,
     create_neurons,
 )
-
-dirname = os.path.dirname(__file__)
-setups_dict = ParameterSet(dirname + "/setups.prm")
 
 
 def simulate(
@@ -291,7 +287,3 @@ def stats(
 
     ss = stats_object.calc_dict(simulation_outputs)
     return ss
-
-
-def load_setup(name):
-    return setups_dict[name]
