@@ -112,14 +112,11 @@ class PrinzStats:
     def __init__(
         self, setup, t_on, t_off, dt,
     ):
-        """See SummaryStats.py for docstring"""
+        """Compute summary statistics."""
         self.setup = setup
         self.t_on = t_on
         self.t_off = t_off
         self.dt = dt
-        self.include_pyloricness = self.setup["pyloric_like"]
-        self.include_plateaus = self.setup["plateau_durations"]
-        self.energy = self.setup["energies"]
 
     def calc_dict(self, simulation_output):
 
@@ -138,7 +135,7 @@ class PrinzStats:
             energy = np.zeros_like(v)
 
         # Retrieve summary statistics stored in a dictionary.
-        stats = self.calc_summ_stats(v, energy, t_max, dt, self.include_pyloricness)
+        stats = self.calc_summ_stats(v, energy, t_max, dt)
 
         keys = [
             "cycle_period",
@@ -149,6 +146,7 @@ class PrinzStats:
             "ends_to_starts",
             "phase_gaps",
             "plateau_durations",
+            "pyloric_like",
             "energies_per_spike",
             "num_bursts",
             "energies_per_burst",
@@ -162,9 +160,6 @@ class PrinzStats:
             "spike_heights",
             "rebound_times",
         ]
-
-        if self.include_pyloricness:
-            keys.append("pyloric_like")
 
         new_dict = {}
         neuron_types = ["PM", "LP", "PY"]
@@ -208,6 +203,7 @@ class PrinzStats:
         pd_ret = pd.DataFrame(
             np.asarray([all_data]), columns=[general_names, specific_names]
         )
+
         return pd_ret
 
     @staticmethod
@@ -247,7 +243,7 @@ class PrinzStats:
         v = scipy.signal.savgol_filter(v_original, window_size, 3)
 
         # V = scipy.signal.savgol_filter(V, int(1 / dt), 3)
-        # remaining negative slopes are at spike peaks
+        # Remaining negative slopes are at spike peaks.
         spike_indices = np.where(
             (v[1:-1] > spike_thresh) & (np.diff(v[:-1]) >= 0) & (np.diff(v[1:]) <= 0)
         )[0]
@@ -348,7 +344,7 @@ class PrinzStats:
                 burst_start_ind = np.where(t == burst_start)[0][0]
                 burst_end_ind = np.where(t == burst_end)[0][0]
 
-                # get energy within bursts
+                # Get energy within bursts.
                 # adding 80 cause we want to start 2 ms earlier and end 12 ms later.
                 # 2 ms / 0.025 Hz = 80
                 energy_within_burst = deepcopy(
@@ -360,7 +356,9 @@ class PrinzStats:
             mean_energy_per_spike_in_all_bursts = (
                 cum_energy_per_spike_in_burst / np.maximum(1, num_spikes)
             )
-            energy_per_burst = np.mean(energies_per_burst)
+            energy_per_burst = (
+                np.mean(energies_per_burst) if energies_per_burst else nan
+            )
 
             # PLATEAUS
             # we cluster the voltage into blocks. Each block starts with the current
@@ -396,20 +394,20 @@ class PrinzStats:
                         current = 0
                 running_ind += 1
                 longest_list.append(longest * stepping)
-            plateau_durations = np.mean(longest_list)
+            plateau_durations = np.mean(longest_list) if longest_list else nan
             if plateau_durations < 200:
                 # Make sure that the duration of a single spike is not a feature
                 plateau_durations = 100
             plateau_durations *= t[1] - t[0]  # convert to ms
 
-            avg_burst_length = np.average(burst_lengths)
+            avg_burst_length = np.mean(burst_lengths) if burst_lengths.tolist() else nan
 
             if len(burst_times) == 1:
                 avg_ibi_length = nan
 
             else:
                 ibi_lengths = burst_times.T[0][1:] - burst_times.T[1][:-1]
-                avg_ibi_length = np.mean(ibi_lengths)
+                avg_ibi_length = np.mean(ibi_lengths) if ibi_lengths.tolist() else nan
 
             # A neuron is classified as bursting if we can detect multiple bursts and
             # not too many bursts consist of single spikes (to separate bursting
@@ -424,7 +422,9 @@ class PrinzStats:
                     neuron_type = "non-bursting"
 
                 cycle_lengths = np.diff(burst_times.T[0])
-                avg_cycle_length = np.average(cycle_lengths)
+                avg_cycle_length = (
+                    np.mean(cycle_lengths) if cycle_lengths.tolist() else nan
+                )
 
         # A neuron is classified as silent if it doesn't spike enough and as tonic if
         # it spikes too much.
@@ -541,7 +541,7 @@ class PrinzStats:
 
         return stats
 
-    def calc_summ_stats(self, data, energies, tmax, dt, include_pyloric_ness):
+    def calc_summ_stats(self, data, energies, tmax, dt):
         """
         Compute features of single neurons and use them to return circuit-level stats.
         """
@@ -601,21 +601,17 @@ class PrinzStats:
                 # triphasic systems are candidate pyloric-like systems, so we collect
                 # some information
                 for nt2 in neuron_types:
-                    ends_to_starts[nt, nt2] = np.mean(
-                        [
-                            e[nt2][0] - e[nt][1]
-                            for e in single_neuron_stats["period_data"]
-                        ]
-                    )
+                    list_es = [
+                        e[nt2][0] - e[nt][1] for e in single_neuron_stats["period_data"]
+                    ]
+                    ends_to_starts[nt, nt2] = list_es if list_es else nan
                     phase_gaps[nt, nt2] = (
                         ends_to_starts[nt, nt2] / single_neuron_stats["cycle_period"]
                     )
-                    starts_to_starts[nt, nt2] = np.mean(
-                        [
-                            e[nt2][0] - e[nt][0]
-                            for e in single_neuron_stats["period_data"]
-                        ]
-                    )
+                    list_ss = [
+                        e[nt2][0] - e[nt][0] for e in single_neuron_stats["period_data"]
+                    ]
+                    starts_to_starts[nt, nt2] = list_ss if list_ss else nan
 
                 start_phases[nt] = (
                     starts_to_starts[neuron_types[0], nt]
@@ -634,10 +630,12 @@ class PrinzStats:
                 for e in single_neuron_stats["period_data"]
             ]
         )
-        pyloric_like = (
-            single_neuron_stats["triphasic"]
-            and np.mean(np.all(pyloric_analysis <= 0, axis=1)) >= pyloric_thresh
-        )
+        pyloric_like = False
+        if single_neuron_stats["triphasic"]:
+            all_pyloric_analyses = np.all(pyloric_analysis <= 0, axis=1)
+            mean_of_pylorics = np.mean(all_pyloric_analyses)
+            if mean_of_pylorics >= pyloric_thresh:
+                pyloric_like = True
 
         single_neuron_stats.update(
             {
@@ -664,9 +662,6 @@ class PrinzStats:
                 "voltage_kurtoses": voltage_kurtosis,
             }
         )
-
-        if include_pyloric_ness:
-            single_neuron_stats.update({"pyloric_like": pyloric_like})
 
         # This is just for plotting purposes, a convenience hack
         for nt in neuron_types:
