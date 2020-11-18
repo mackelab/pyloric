@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Dict, Tuple, Optional, List
+import pandas as pd
 
 
 def create_neurons(neuron_list):
@@ -39,6 +40,34 @@ def create_neurons(neuron_list):
     return np.asarray(ret)
 
 
+def membrane_conductances_replaced_with_defaults(circuit_parameters, defaults_dict):
+    default_neurons = create_neurons(defaults_dict["membrane_gbar"])
+    default_neurons = np.reshape(default_neurons, (1, 24))
+    type_names, cond_names = select_names()
+    type_names = type_names[:24]
+    cond_names = cond_names[:24]
+    circuit_parameters = circuit_parameters
+    default_neurons_pd = pd.DataFrame(default_neurons, columns=[type_names, cond_names])
+    for tn, cn in zip(type_names, cond_names):
+        if (tn, cn) in circuit_parameters:
+            default_neurons_pd.loc[0][tn, cn] = circuit_parameters[tn, cn]
+    return default_neurons_pd
+
+
+def synapses_replaced_with_defaults(circuit_parameters, defaults_dict):
+    type_names, cond_names = select_names()
+    type_names = type_names[24:]
+    cond_names = cond_names[24:]
+    data_array = []
+    for tn, cn in zip(type_names, cond_names):
+        if (tn, cn) in circuit_parameters:
+            data_array.append(circuit_parameters[tn, cn])
+    data_array = np.asarray([data_array])
+    print(data_array)
+    default_synapse_values = pd.DataFrame(data_array, columns=[type_names, cond_names])
+    return default_synapse_values
+
+
 def build_conns(params):
 
     # Reversal voltages and dissipation time constants for the synapses, taken from
@@ -68,10 +97,26 @@ def ensure_array_not_scalar(selector):
     return np.asarray(selector)
 
 
-def select_names(setup: Dict) -> Tuple[List, np.ndarray]:
+def select_names(setup: Dict = {}) -> Tuple[List, np.ndarray]:
     """
     Returns the names of all parameters that are selected in the `setup` dictionary.
     """
+    default_setup = {
+        "membrane_gbar": [
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+        ],
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
+        "Q10_tau_m": [False],
+        "Q10_tau_h": [False],
+        "Q10_tau_CaBuff": [False],
+    }
+    default_setup.update(setup)
+    setup = default_setup
+
     gbar = np.asarray([_channel_names()[c] for c in setup["membrane_gbar"]]).flatten()
     syn = _synapse_names()
     q10_mem_gbar = _q10_mem_gbar_names()[setup["Q10_gbar_mem"]]

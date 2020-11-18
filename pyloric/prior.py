@@ -41,12 +41,12 @@ def create_prior(
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
         ],
-        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
-        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
         "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
         "Q10_tau_m": False,
         "Q10_tau_h": False,
         "Q10_tau_CaBuff": False,
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
     }
     setups.update(customization)
     for key in setups.keys():

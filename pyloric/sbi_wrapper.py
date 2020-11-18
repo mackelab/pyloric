@@ -17,6 +17,8 @@ from pyloric.summary_statistics import PrinzStats
 from pyloric.utils import (
     build_conns,
     create_neurons,
+    membrane_conductances_replaced_with_defaults,
+    synapses_replaced_with_defaults,
 )
 
 
@@ -83,18 +85,24 @@ def simulate(
             ["LP", "LP_3", 0.628e-3],
             ["PY", "PY_4", 0.628e-3],
         ],
-        "Q10_gbar_syn": [1.5, 1.5],
-        "Q10_tau_syn": [1.7, 1.7],
         "Q10_gbar_mem": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+        "Q10_gbar_syn": [1.5, 1.5],
         "Q10_tau_m": [1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7],
         "Q10_tau_h": [2.8, 2.8, 2.8, 2.8],
         "Q10_tau_CaBuff": 1.7,
+        "Q10_tau_syn": [1.7, 1.7],
     }
     defaults_dict.update(defaults)
 
     t = np.arange(0, t_max, dt)
 
-    neurons = create_neurons(defaults_dict["membrane_gbar"])
+    membrane_conductances = membrane_conductances_replaced_with_defaults(
+        circuit_parameters, defaults_dict
+    )
+    synaptic_conductances = synapses_replaced_with_defaults(
+        circuit_parameters, defaults_dict
+    )
+    # q10_values_as_pd = ... # todo
 
     if isinstance(circuit_parameters, pd.DataFrame):
         circuit_parameters = circuit_parameters.to_numpy()
@@ -189,7 +197,13 @@ def simulate(
         rng = np.random.RandomState()
     I = rng.normal(scale=noise_std, size=(3, len(t)))
 
-    # calling the solver --> HH.HH()
+    # print("g_q10_conns_gbar", split_parameters[0])
+    # print("g_q10_conns_tau", split_parameters[1])
+    # print("g_q10_memb_gbar", split_parameters[2])
+    # print("g_q10_memb_tau_m", split_parameters[3])
+    # print("g_q10_memb_tau_h", split_parameters[4])
+    # print("g_q10_memb_tau_CaBuff", split_parameters[5])
+
     data = sim_time(
         dt,
         t,
@@ -197,7 +211,7 @@ def simulate(
         membrane_conds,  # membrane conductances
         conns,  # synaptic conductances (always variable)
         g_q10_conns_gbar=split_parameters[0],
-        g_q10_conns_tau=split_parameters[1],  # Q10 synaptic tau
+        g_q10_conns_tau=split_parameters[1],
         g_q10_memb_gbar=split_parameters[2],
         g_q10_memb_tau_m=split_parameters[3],
         g_q10_memb_tau_h=split_parameters[4],

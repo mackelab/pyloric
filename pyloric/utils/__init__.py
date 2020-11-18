@@ -4,4 +4,6 @@ from pyloric.utils.circuit_parameters import (
     create_neurons,
     select_names,
     ensure_array_not_scalar,
+    membrane_conductances_replaced_with_defaults,
+    synapses_replaced_with_defaults,
 )
