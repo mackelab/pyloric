@@ -26,7 +26,8 @@ import os
 
 # maxcellisi, mincellisi
 # is_modulated_tonic: if largest IMI is less than 5 times the smalles ISI
-# isithreshold: 99% of the largest ISI for modulated tonics, ie. only the largest ISI becomes an IBI
+# isithreshold: 99% of the largest ISI for modulated tonics, ie. only the largest ISI
+# becomes an IBI
 #               50% of the largest ISI if it is more than 2 times the mean ISI
 #               otherwise, the mean ISI
 #               but the maximum is always 0.5s
@@ -39,7 +40,8 @@ import os
 # cellibi
 # ibinum
 
-# if more than 10 spikes in detection window (5s), cell is tonic if diff between max and min isi as a fraction of their average is less than 5%
+# if more than 10 spikes in detection window (5s), cell is tonic if diff between max
+# and min isi as a fraction of their average is less than 5%
 # a tonic cell is not a modulated tonic
 
 # For non-tonic cells:
@@ -48,14 +50,18 @@ import os
 # cellibispercycle: 0 if no IBIs
 
 # to find out if a cell with IBIs is periodic, go backwards through the IBIs
-# if difference between any two consecutive IBIs is less than 5% as a fraction of their average, this is consistend with periodic bursting
+# if difference between any two consecutive IBIs is less than 5% as a fraction of their
+# average, this is consistend with periodic bursting
 # so you can read off the burst period 1
-# then compare the current ibi to second to last detected, then third, for burst period 2 and 3 resp.
+# then compare the current ibi to second to last detected, then third, for burst period
+# 2 and 3 resp.
 # then take the smallest of the three periods, and corresponding ibispercycle
 
 # now to find the number of IBIs per period
-# temporary time window : end is middle of last IBI, start is one period before the end time (cellperiod * cyclespp)
-# find longest IBI that ends within the temp time window. set window end to middle of this IBI
+# temporary time window : end is middle of last IBI, start is one period before the end
+# time (cellperiod * cyclespp)
+# find longest IBI that ends within the temp time window. set window end to middle of
+# this IBI
 # window start is again one period before window end
 # count IBIs within this window
 # also count IBIs in window one period before this
@@ -84,15 +90,18 @@ import os
 # period = avgperiod
 
 # Now go through all cells. Tonic cells are to be checked.
-# Cells that spike periodically are to be checked if cyclespp * cellibispercycle == ibiicipp and the latter equal ibiicippbefore
+# Cells that spike periodically are to be checked if cyclespp * cellibispercycle ==
+# ibiicipp and the latter equal ibiicippbefore
 # Analogous for non-spiking periodical cells
 
-# If all cells are checked and we have enough time (at least 2 * period), periodic = true
+# If all cells are checked and we have enough time (at least 2 * period), periodic =
+# true
 # else periodic is false and no consistent cycles per period or IBIs or ICIs are found
 # If no periodic spikes, do the same for subthreshold maxima
 
 
-# for periodic cells, if cyclespp are all 1 andn ibispercycle are all 1, triphasic is true
+# for periodic cells, if cyclespp are all 1 andn ibispercycle are all 1, triphasic is
+# true
 # rhythm is pyloric if bursts are in correct order
 
 # Maxima detected by slope switching from pos to neg
@@ -108,30 +117,28 @@ class PrinzStats:
         self.t_on = t_on
         self.t_off = t_off
         self.dt = dt
-        self.include_pyloric_ness = self.setup["pyloric_like"]
+        self.include_pyloricness = self.setup["pyloric_like"]
         self.include_plateaus = self.setup["plateau_durations"]
         self.energy = self.setup["energies"]
 
-    def calc_dict(self, repetition_list):
+    def calc_dict(self, simulation_output):
 
-        x = repetition_list
-
-        tmax = self.t_off
+        t_max = self.t_off
         dt = self.dt
         t_on = self.t_on
         t_off = self.t_off
 
-        Vx = x["voltage"]
-        Vx = Vx[:, int(t_on / dt) : int(t_off / dt)]
+        v = simulation_output["voltage"]
+        v = v[:, int(t_on / dt) : int(t_off / dt)]
 
-        try:
-            energy = x["energy"]
+        if "energy" in simulation_output.keys():
+            energy = simulation_output["energy"]
             energy = energy[:, int(t_on / dt) : int(t_off / dt)]
-        except:
-            energy = np.zeros_like(Vx)
+        else:
+            energy = np.zeros_like(v)
 
-        # retreive summary statistics stored in a dictionary
-        summ = self.calc_summ_stats(Vx, energy, tmax, dt, self.include_pyloric_ness)
+        # Retrieve summary statistics stored in a dictionary.
+        stats = self.calc_summ_stats(v, energy, t_max, dt, self.include_pyloricness)
 
         keys = [
             "cycle_period",
@@ -156,22 +163,22 @@ class PrinzStats:
             "rebound_times",
         ]
 
-        if self.include_pyloric_ness:
+        if self.include_pyloricness:
             keys.append("pyloric_like")
 
         new_dict = {}
-        neutypes = ["PM", "LP", "PY"]
+        neuron_types = ["PM", "LP", "PY"]
         general_names = []
         specific_names = []
         all_data = []
 
         for key in keys:
             if self.setup[key]:
-                new_dict[key] = summ[key]
-                if isinstance(summ[key], float):
+                new_dict[key] = stats[key]
+                if isinstance(stats[key], float):
                     general_names += [key]
                     specific_names += ["Circuit"]
-                    all_data += [summ[key]]
+                    all_data += [stats[key]]
                 else:
                     if key in [
                         "ends_to_starts",
@@ -179,20 +186,20 @@ class PrinzStats:
                         "phase_gaps",
                     ]:
                         all_data += [
-                            summ[key][neutypes[i], neutypes[j]]
+                            stats[key][neuron_types[i], neuron_types[j]]
                             for i, j in ((0, 1), (1, 2))
                         ]
                         general_names += [key] * 2
                         specific_names += ["AB/PD-LP", "LP-PY"]
                     elif key == "start_phases":
-                        all_data += [summ[key][neutypes[i]] for i in (1, 2)]
+                        all_data += [stats[key][neuron_types[i]] for i in (1, 2)]
                         general_names += [key] * 2
                         specific_names += ["LP", "PY"]
                     else:
-                        for specific_name in summ[key].keys():
+                        for specific_name in stats[key].keys():
                             general_names += [key]
                             specific_names += [specific_name]
-                            all_data += [summ[key][specific_name]]
+                            all_data += [stats[key][specific_name]]
 
         all_data = np.asarray(all_data)
         general_names = np.asarray(general_names)
@@ -203,60 +210,69 @@ class PrinzStats:
         )
         return pd_ret
 
-    # Analyse voltage trace of a single neuron
-    def analyse_neuron(self, t, V_original, energy):
+    @staticmethod
+    def analyse_neuron(t, v_original, energy):
+        """Analyse voltage trace of a single neuron."""
 
-        silent_thresh = 1  # minimum number of spikes per second for a neuron not to be considered silent
-        tonic_thresh = 30  # minimum number of spikes per second for a neuron to be considered tonically firing
-        burst_thresh = 0.5  # maximum percentage of single-spike bursts for a neuron to be considered
+        # Minimum number of spikes per second for a neuron not to be considered silent
+        silent_thresh = 1
+        # Minimum number of spikes per second for a neuron to be considered tonically.
+        # firing.
+        tonic_thresh = 30
+        # Maximum percentage of single-spike bursts for a neuron to be considered.
         # bursting (and not simply spiking)
-        bl_thresh = 40  # minimum number of milliseconds for bursts not to be discounted as single spikes
-        spike_thresh = -10  # minimum voltage above which spikes are considered
-        ibi_threshold = 150  # maximum time between spikes in a given burst (ibi = inter-burst interval)
-        plateau_threshold = -30  # minimum voltage to be considered for plateaus
+        burst_thresh = 0.5
+        # Minimum number of milliseconds for bursts not to be discounted as single
+        # spikes.
+        bl_thresh = 40
+        # Minimum voltage above which spikes are considered.
+        spike_thresh = -10
+        # Maximum time between spikes in a given burst (ibi = inter-burst interval).
+        ibi_threshold = 150
+        # Minimum voltage to be considered for plateaus.
+        plateau_threshold = -30
 
-        NaN = float("nan")
+        nan = float("nan")
 
-        tmax = t[-1]
-        wsize = int(0.5 / (t[1] - t[0]))
-        if wsize % 2 == 0:
-            wsize += 1
+        t_max = t[-1]
+        window_size = int(0.5 / (t[1] - t[0]))
+        if window_size % 2 == 0:
+            window_size += 1
 
-        voltage_mean = np.mean(V_original)
-        voltage_std = np.std(V_original)
-        voltage_skew = scipy.stats.skew(V_original)
-        voltage_kurtosis = scipy.stats.kurtosis(V_original)
+        voltage_mean = np.mean(v_original)
+        voltage_std = np.std(v_original)
+        voltage_skew = scipy.stats.skew(v_original)
+        voltage_kurtosis = scipy.stats.kurtosis(v_original)
 
-        V = scipy.signal.savgol_filter(V_original, wsize, 3)
-        V = V_original
+        v = scipy.signal.savgol_filter(v_original, window_size, 3)
 
-        # # V = scipy.signal.savgol_filter(V, int(1 / dt), 3)
-        # # remaining negative slopes are at spike peaks
-        spike_inds = np.where(
-            (V[1:-1] > spike_thresh) & (np.diff(V[:-1]) >= 0) & (np.diff(V[1:]) <= 0)
+        # V = scipy.signal.savgol_filter(V, int(1 / dt), 3)
+        # remaining negative slopes are at spike peaks
+        spike_indices = np.where(
+            (v[1:-1] > spike_thresh) & (np.diff(v[:-1]) >= 0) & (np.diff(v[1:]) <= 0)
         )[0]
-        spike_times = t[spike_inds]
+        spike_times = t[spike_indices]
         num_spikes = len(spike_times)
 
-        spike_heights = V_original[spike_inds]
+        spike_heights = v_original[spike_indices]
 
         # refractory period begins when slopes start getting positive again
-        rebound_inds = np.where(
-            (V[1:-1] < spike_thresh) & (np.diff(V[:-1]) <= 0) & (np.diff(V[1:]) >= 0)
+        rebound_indices = np.where(
+            (v[1:-1] < spike_thresh) & (np.diff(v[:-1]) <= 0) & (np.diff(v[1:]) >= 0)
         )[0]
 
         # assign rebounds to the corresponding spikes, save their times in rebound_times
-        if len(rebound_inds) == 0:
-            rebound_times = np.empty_like(spike_times) * NaN
+        if len(rebound_indices) == 0:
+            rebound_times = np.empty_like(spike_times) * nan
         else:
             rebound_times = np.empty_like(spike_times)
 
             # for each spike, find the corresponding rebound (NaN if it doesn't exist)
             for i in range(num_spikes):
-                si = spike_inds[i]
-                rebound_ind = rebound_inds[np.argmax(rebound_inds > si)]
+                si = spike_indices[i]
+                rebound_ind = rebound_indices[np.argmax(rebound_indices > si)]
                 if rebound_ind <= si:
-                    rebound_times[i:] = NaN
+                    rebound_times[i:] = nan
                     break
 
                 rebound_times[i] = t[rebound_ind]
@@ -272,11 +288,11 @@ class PrinzStats:
             num_bursts = 0
             energy_per_burst = 0
 
-            plateau_durations = NaN
-            avg_burst_length = NaN
-            avg_ibi_length = NaN
-            avg_cycle_length = NaN
-            avg_spike_length = NaN
+            plateau_durations = nan
+            avg_burst_length = nan
+            avg_ibi_length = nan
+            avg_cycle_length = nan
+            avg_spike_length = nan
             mean_energy_per_spike_in_all_bursts = 0.0
         else:
 
@@ -287,7 +303,7 @@ class PrinzStats:
             if (
                 len(spike_times) == 0 and last_term_spike_ind == -1
             ):  # No terminating spike
-                avg_spike_length = NaN
+                avg_spike_length = nan
             else:
                 avg_spike_length = np.mean(
                     rebound_times[:last_term_spike_ind]
@@ -357,7 +373,7 @@ class PrinzStats:
 
             longest_list = []
             t = np.asarray(t)
-            above_th_all = V > plateau_threshold
+            above_th_all = v > plateau_threshold
             stepping = 10  # subsampling for computational speed
             for running_ind in range(len(burst_start_times)):
                 if running_ind == len(burst_start_times) - 1:
@@ -389,7 +405,7 @@ class PrinzStats:
             avg_burst_length = np.average(burst_lengths)
 
             if len(burst_times) == 1:
-                avg_ibi_length = NaN
+                avg_ibi_length = nan
 
             else:
                 ibi_lengths = burst_times.T[0][1:] - burst_times.T[1][:-1]
@@ -400,7 +416,7 @@ class PrinzStats:
             # neurons from singly spiking neurons).
             if len(burst_times) == 1:
                 neuron_type = "non-bursting"
-                avg_cycle_length = NaN
+                avg_cycle_length = nan
             else:
                 if len(burst_times) / len(spike_times) >= burst_thresh:
                     neuron_type = "bursting"
@@ -413,9 +429,9 @@ class PrinzStats:
         # A neuron is classified as silent if it doesn't spike enough and as tonic if
         # it spikes too much.
         # Recall that tmax is given in ms.
-        if len(spike_times) * 1e3 / tmax <= silent_thresh:
+        if len(spike_times) * 1e3 / t_max <= silent_thresh:
             neuron_type = "silent"
-        elif len(spike_times) * 1e3 / tmax >= tonic_thresh:
+        elif len(spike_times) * 1e3 / t_max >= tonic_thresh:
             neuron_type = "tonic"
 
         return {
@@ -442,35 +458,28 @@ class PrinzStats:
         }
 
     # Analyse voltage traces; check for triphasic (periodic) behaviour
-    def analyse_data(self, data, energies, tmax, dt):
-        neutypes = ["PM", "LP", "PY"]
-        ref_neuron = neutypes[0]
-        triphasic_thresh = (
-            0.9  # percentage of triphasic periods for system to be considered triphasic
-        )
-        NaN = float("nan")
+    def analyse_data(self, data, energies, t_max, dt):
+        neuron_types = ["PM", "LP", "PY"]
+        ref_neuron = neuron_types[0]
 
-        t = np.arange(0, tmax, dt)
-        Vx = data
+        # Percentage of triphasic periods for system to be considered triphasic.
+        triphasic_thresh = 0.9
+        nan = float("nan")
 
-        assert len(Vx) == len(neutypes)
+        t = np.arange(0, t_max, dt)
+        v = data
+
+        assert len(v) == len(neuron_types)
 
         stats = {
             neutype: self.analyse_neuron(t, np.asarray(V), energy)
-            for V, neutype, energy in zip(Vx, neutypes, energies)
+            for V, neutype, energy in zip(v, neuron_types, energies)
         }
-
-        cycle_lengths = np.asarray([stats[nt]["avg_cycle_length"] for nt in neutypes])
-
-        # Is this really needed?
-        if np.count_nonzero(np.isnan(cycle_lengths)) > 0:
-            triphasic = False
-            period_data = []
 
         # if one neuron does not have a periodic rhythm, the whole system is not
         # considered triphasic
         if np.isnan(stats[ref_neuron]["avg_cycle_length"]):
-            cycle_period = NaN
+            cycle_period = nan
             period_times = []
 
             triphasic = False
@@ -494,7 +503,7 @@ class PrinzStats:
                 burst_starts = {}
                 burst_ends = {}
 
-                for nt in neutypes:
+                for nt in neuron_types:
                     bs_nt = stats[nt]["burst_start_times"]
                     be_nt = stats[nt]["burst_end_times"]
 
@@ -508,10 +517,10 @@ class PrinzStats:
 
                 # A period is classified as triphasic if all neurons start to burst
                 # once within the period
-                if np.all([len(burst_starts[nt]) == 1 for nt in neutypes]):
+                if np.all([len(burst_starts[nt]) == 1 for nt in neuron_types]):
                     period_triphasic[i] = 1
                     period_data.append(
-                        {nt: (burst_starts[nt], burst_ends[nt]) for nt in neutypes}
+                        {nt: (burst_starts[nt], burst_ends[nt]) for nt in neuron_types}
                     )
 
             # if we have at least two periods and most of them are triphasic, classify
@@ -520,10 +529,6 @@ class PrinzStats:
                 triphasic = np.mean(period_triphasic) >= triphasic_thresh
             else:
                 triphasic = False
-
-        # plateau_durations = []
-        # for nt in neutypes:
-        #    plateau_durations.append(stats[nt]["plateau_durations"])
 
         stats.update(
             {
@@ -537,14 +542,16 @@ class PrinzStats:
         return stats
 
     def calc_summ_stats(self, data, energies, tmax, dt, include_pyloric_ness):
-        neutypes = ["PM", "LP", "PY"]
-        pyloric_thresh = (
-            0.7  # percentage of pyloric periods for triphasic system to be pyloric_like
-        )
+        """
+        Compute features of single neurons and use them to return circuit-level stats.
+        """
+        neuron_types = ["PM", "LP", "PY"]
+        # Percentage of pyloric periods for triphasic system to be pyloric_like.
+        pyloric_thresh = 0.7
 
-        NaN = float("nan")
+        nan = float("nan")
 
-        summ = self.analyse_data(data, energies, tmax, dt)
+        single_neuron_stats = self.analyse_data(data, energies, tmax, dt)
 
         burst_durations = {}
         duty_cycles = {}
@@ -566,44 +573,53 @@ class PrinzStats:
         voltage_skew = {}
         voltage_kurtosis = {}
 
-        for nt in neutypes:
-            burst_durations[nt] = summ[nt]["avg_burst_length"]
-            duty_cycles[nt] = burst_durations[nt] / summ["cycle_period"]
-            plateau_durations[nt] = summ[nt]["plateau_durations"]
-            energy[nt] = summ[nt]["energies_per_spike"]
-            num_bursts[nt] = summ[nt]["num_bursts"]
-            energy_per_burst[nt] = summ[nt]["energies_per_burst"]
-            total_energy[nt] = summ[nt]["energies"]
-            num_spikes[nt] = summ[nt]["num_spikes"]
-            spike_times[nt] = summ[nt]["spike_times"]
-            spike_heights[nt] = summ[nt]["spike_heights"]
-            rebound_times[nt] = summ[nt]["rebound_times"]
-            voltage_mean[nt] = summ[nt]["voltage_means"]
-            voltage_std[nt] = summ[nt]["voltage_stds"]
-            voltage_skew[nt] = summ[nt]["voltage_skews"]
-            voltage_kurtosis[nt] = summ[nt]["voltage_kurtoses"]
+        for nt in neuron_types:
+            burst_durations[nt] = single_neuron_stats[nt]["avg_burst_length"]
+            duty_cycles[nt] = burst_durations[nt] / single_neuron_stats["cycle_period"]
+            plateau_durations[nt] = single_neuron_stats[nt]["plateau_durations"]
+            energy[nt] = single_neuron_stats[nt]["energies_per_spike"]
+            num_bursts[nt] = single_neuron_stats[nt]["num_bursts"]
+            energy_per_burst[nt] = single_neuron_stats[nt]["energies_per_burst"]
+            total_energy[nt] = single_neuron_stats[nt]["energies"]
+            num_spikes[nt] = single_neuron_stats[nt]["num_spikes"]
+            spike_times[nt] = single_neuron_stats[nt]["spike_times"]
+            spike_heights[nt] = single_neuron_stats[nt]["spike_heights"]
+            rebound_times[nt] = single_neuron_stats[nt]["rebound_times"]
+            voltage_mean[nt] = single_neuron_stats[nt]["voltage_means"]
+            voltage_std[nt] = single_neuron_stats[nt]["voltage_stds"]
+            voltage_skew[nt] = single_neuron_stats[nt]["voltage_skews"]
+            voltage_kurtosis[nt] = single_neuron_stats[nt]["voltage_kurtoses"]
 
-            if not summ["triphasic"]:
-                for nt2 in neutypes:
-                    ends_to_starts[nt, nt2] = NaN
-                    phase_gaps[nt, nt2] = NaN
-                    starts_to_starts[nt, nt2] = NaN
+            if not single_neuron_stats["triphasic"]:
+                for nt2 in neuron_types:
+                    ends_to_starts[nt, nt2] = nan
+                    phase_gaps[nt, nt2] = nan
+                    starts_to_starts[nt, nt2] = nan
 
-                start_phases[nt] = NaN
+                start_phases[nt] = nan
             else:
                 # triphasic systems are candidate pyloric-like systems, so we collect
                 # some information
-                for nt2 in neutypes:
+                for nt2 in neuron_types:
                     ends_to_starts[nt, nt2] = np.mean(
-                        [e[nt2][0] - e[nt][1] for e in summ["period_data"]]
+                        [
+                            e[nt2][0] - e[nt][1]
+                            for e in single_neuron_stats["period_data"]
+                        ]
                     )
-                    phase_gaps[nt, nt2] = ends_to_starts[nt, nt2] / summ["cycle_period"]
+                    phase_gaps[nt, nt2] = (
+                        ends_to_starts[nt, nt2] / single_neuron_stats["cycle_period"]
+                    )
                     starts_to_starts[nt, nt2] = np.mean(
-                        [e[nt2][0] - e[nt][0] for e in summ["period_data"]]
+                        [
+                            e[nt2][0] - e[nt][0]
+                            for e in single_neuron_stats["period_data"]
+                        ]
                     )
 
                 start_phases[nt] = (
-                    starts_to_starts[neutypes[0], nt] / summ["cycle_period"]
+                    starts_to_starts[neuron_types[0], nt]
+                    / single_neuron_stats["cycle_period"]
                 )
 
         # The three conditions from Prinz' paper must hold (most of the time) for the
@@ -611,21 +627,21 @@ class PrinzStats:
         pyloric_analysis = np.asarray(
             [
                 (
-                    e[neutypes[1]][0] - e[neutypes[2]][0],
-                    e[neutypes[1]][1] - e[neutypes[2]][1],
-                    e[neutypes[0]][1] - e[neutypes[1]][0],
+                    e[neuron_types[1]][0] - e[neuron_types[2]][0],
+                    e[neuron_types[1]][1] - e[neuron_types[2]][1],
+                    e[neuron_types[0]][1] - e[neuron_types[1]][0],
                 )
-                for e in summ["period_data"]
+                for e in single_neuron_stats["period_data"]
             ]
         )
         pyloric_like = (
-            summ["triphasic"]
+            single_neuron_stats["triphasic"]
             and np.mean(np.all(pyloric_analysis <= 0, axis=1)) >= pyloric_thresh
         )
 
-        summ.update(
+        single_neuron_stats.update(
             {
-                "cycle_period": summ["cycle_period"],
+                "cycle_period": single_neuron_stats["cycle_period"],
                 "burst_durations": burst_durations,
                 "duty_cycles": duty_cycles,
                 "start_phases": start_phases,
@@ -650,10 +666,12 @@ class PrinzStats:
         )
 
         if include_pyloric_ness:
-            summ.update({"pyloric_like": pyloric_like})
+            single_neuron_stats.update({"pyloric_like": pyloric_like})
 
         # This is just for plotting purposes, a convenience hack
-        for nt in neutypes:
-            summ[nt]["period_times"] = summ["period_times"]
+        for nt in neuron_types:
+            single_neuron_stats[nt]["period_times"] = single_neuron_stats[
+                "period_times"
+            ]
 
-        return summ
+        return single_neuron_stats

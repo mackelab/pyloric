@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 import pyximport
 import numpy
 import pandas as pd
@@ -21,7 +21,7 @@ from pyloric.utils import (
 
 
 def simulate(
-    circuit_parameters: pd.DataFrame,
+    circuit_parameters: Union[np.array, pd.DataFrame],
     dt: float = 0.025,
     t_max: int = 11000,
     temperature: int = 283,
@@ -96,7 +96,8 @@ def simulate(
 
     neurons = create_neurons(defaults_dict["membrane_gbar"])
 
-    circuit_parameters = circuit_parameters.to_numpy()
+    if isinstance(circuit_parameters, pd.DataFrame):
+        circuit_parameters = circuit_parameters.to_numpy()
 
     # define lists to loop over to assemble the parameters
     param_classes = [
