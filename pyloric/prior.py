@@ -158,30 +158,24 @@ def _get_min_max_membrane_gbar(selector: np.ndarray) -> Tuple[np.ndarray, np.nda
         membrane conductances that were selected in the `selector` array.
     """
     # Contains the minimal values that were used by Prinz et al.
-    membrane_cond_mins = (
-        np.asarray(
-            [
-                [100, 2.5, 2, 10, 5, 50, 0.01, 0.0],  # PM
-                [100, 0.0, 4, 20, 0, 25, 0.0, 0.02],  # LP
-                [100, 2.5, 0, 40, 0, 75, 0.0, 0.0],  # PY
-            ]
-        )
-        * 0.628e-3
+    membrane_cond_mins = np.asarray(
+        [
+            [100, 2.5, 2, 10, 5, 50, 0.01, 0.0],  # PM
+            [100, 0.0, 4, 20, 0, 25, 0.0, 0.02],  # LP
+            [100, 2.5, 0, 40, 0, 75, 0.0, 0.0],  # PY
+        ]
     )
 
     # Contains the maximal values that were used by Prinz et al.
-    membrane_cond_maxs = (
-        np.asarray(
-            [
-                [400, 5, 6, 50, 10, 125, 0.01, 0.0],  # PM
-                [100, 0, 10, 50, 5, 100, 0.05, 0.03],  # LP
-                [500, 10, 2, 50, 0, 125, 0.05, 0.03],  # PY
-            ]
-        )
-        * 0.628e-3
+    membrane_cond_maxs = np.asarray(
+        [
+            [400, 5, 6, 50, 10, 125, 0.01, 0.0],  # PM
+            [100, 0, 10, 50, 5, 100, 0.05, 0.03],  # LP
+            [500, 10, 2, 50, 0, 125, 0.05, 0.03],  # PY
+        ]
     )
 
-    padding = np.asarray([100, 2.5, 2, 10, 5, 25, 0.01, 0.01]) * 0.628e-3
+    padding = np.asarray([100, 2.5, 2, 10, 5, 25, 0.01, 0.01])
     membrane_cond_mins = membrane_cond_mins - padding
     membrane_cond_maxs = membrane_cond_maxs + padding
     membrane_cond_mins[membrane_cond_mins < 0.0] = 0.0

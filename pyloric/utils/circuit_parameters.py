@@ -51,7 +51,7 @@ def membrane_conductances_replaced_with_defaults(circuit_parameters, defaults_di
     default_neurons_pd = pd.DataFrame(default_neurons, columns=[type_names, cond_names])
     for tn, cn in zip(type_names, cond_names):
         if (tn, cn) in circuit_parameters:
-            default_neurons_pd.loc[0][tn, cn] = circuit_parameters[tn, cn]
+            default_neurons_pd.loc[0][tn, cn] = circuit_parameters[tn, cn] * 0.628e-3
     return default_neurons_pd
 
 
