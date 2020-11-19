@@ -484,9 +484,9 @@ def sim_time(
         'Cas': Cax,
         'ICas': ICax,
         'logs': logs,
-        'energy': energy_over_time,
-        'membrane_conds': membrane_conds,
-        'synaptic_conds': cond_syn,
+        'energy': energy_over_time / (0.628*1e-3),
+        'membrane_conds': membrane_conds / (0.628*1e-3),
+        'synaptic_conds': cond_syn / (0.628*1e-3),
         'reversal_calcium': reversal_calcium,
     }
     return ret

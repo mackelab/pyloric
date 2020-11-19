@@ -109,6 +109,7 @@ def simulate(
     )
     q10_values_pd = q10s_replaced_with_defaults(circuit_parameters, defaults_dict)
 
+    membrane_q10_gbar = q10_values_pd["Q10 gbar"].to_numpy()[0, :8]
     synapse_q10_gbar = build_synapse_q10s(q10_values_pd["Q10 gbar"].to_numpy()[0, 8:10])
     synapse_q10_tau = build_synapse_q10s(q10_values_pd["Q10 tau"].to_numpy()[0, 3:5])
     q10_tau_m = q10_values_pd["Q10 tau"]["m"].to_numpy().tolist() * 7
@@ -132,7 +133,7 @@ def simulate(
         build_conns(-np.exp(synaptic_conductances_pd.to_numpy()[0])),
         g_q10_conns_gbar=synapse_q10_gbar,
         g_q10_conns_tau=synapse_q10_tau,
-        g_q10_memb_gbar=q10_values_pd["Q10 gbar"].to_numpy()[0, :8],
+        g_q10_memb_gbar=membrane_q10_gbar,
         g_q10_memb_tau_m=q10_tau_m,
         g_q10_memb_tau_h=q10_tau_h,
         g_q10_memb_tau_CaBuff=q10_tau_cabuff,
