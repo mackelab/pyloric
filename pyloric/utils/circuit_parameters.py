@@ -35,7 +35,9 @@ def create_neurons(neuron_list):
 
     ret = []
     for n in neuron_list:
-        neuron = np.asarray(prinz_neurons[n[0]][n[1]]) * n[2]
+        membrane_area = np.asarray(n[2], dtype=np.float64)
+        pn = np.asarray(prinz_neurons[n[0]][n[1]], dtype=np.float64)
+        neuron = pn * membrane_area
         ret.append(neuron)
     return np.asarray(ret)
 
@@ -46,7 +48,6 @@ def membrane_conductances_replaced_with_defaults(circuit_parameters, defaults_di
     type_names, cond_names = select_names()
     type_names = type_names[:24]
     cond_names = cond_names[:24]
-    circuit_parameters = circuit_parameters
     default_neurons_pd = pd.DataFrame(default_neurons, columns=[type_names, cond_names])
     for tn, cn in zip(type_names, cond_names):
         if (tn, cn) in circuit_parameters:
@@ -63,9 +64,51 @@ def synapses_replaced_with_defaults(circuit_parameters, defaults_dict):
         if (tn, cn) in circuit_parameters:
             data_array.append(circuit_parameters[tn, cn])
     data_array = np.asarray([data_array])
-    print(data_array)
     default_synapse_values = pd.DataFrame(data_array, columns=[type_names, cond_names])
     return default_synapse_values
+
+
+def q10s_replaced_with_defaults(circuit_parameters, defaults_dict):
+    q10_dict = {
+        "membrane_gbar": [
+            [False, False, False, False, False, False, False, False],
+            [False, False, False, False, False, False, False, False],
+            [False, False, False, False, False, False, False, False],
+        ],
+        "synapses": [False, False, False, False, False, False, False],
+        "Q10_gbar_mem": [True, True, True, True, True, True, True, True],
+        "Q10_gbar_syn": [True, True],  # first for glutamate, second for choline
+        "Q10_tau_m": [True],
+        "Q10_tau_h": [True],
+        "Q10_tau_CaBuff": [True],
+        "Q10_tau_syn": [True, True],  # first for glutamate, second for choline
+    }
+    type_names, cond_names = select_names(q10_dict)
+
+    defaults_pd = dict_to_pd(q10_dict, defaults_dict)
+
+    for tn, cn in zip(type_names, cond_names):
+        if (tn, cn) in circuit_parameters:
+            defaults_pd.loc[0][tn, cn] = circuit_parameters[tn, cn]
+
+    return defaults_pd
+
+
+def dict_to_pd(bool_dict, value_dict):
+    data = []
+    for key in bool_dict.keys():
+        for i, entry in enumerate(bool_dict[key]):
+            if entry and not isinstance(entry, List):
+                data.append(value_dict[key][i])
+    data_np = np.asarray([data])
+    type_names, cond_names = select_names(bool_dict)
+    data_pd = pd.DataFrame(data_np, columns=[type_names, cond_names])
+    return data_pd
+
+
+def build_synapse_q10s(vec):
+    """From values of gluatemate and choline, build a 7D vector."""
+    return np.asarray([vec[0], vec[1], vec[0], vec[1], vec[0], vec[0], vec[0]])
 
 
 def build_conns(params):
@@ -107,18 +150,19 @@ def select_names(setup: Dict = {}) -> Tuple[List, np.ndarray]:
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
         ],
-        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
-        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
+        "synapses": [True, True, True, True, True, True, True],
         "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
         "Q10_tau_m": [False],
         "Q10_tau_h": [False],
         "Q10_tau_CaBuff": [False],
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
     }
     default_setup.update(setup)
     setup = default_setup
 
     gbar = np.asarray([_channel_names()[c] for c in setup["membrane_gbar"]]).flatten()
-    syn = _synapse_names()
+    syn = _synapse_names()[setup["synapses"]]
     q10_mem_gbar = _q10_mem_gbar_names()[setup["Q10_gbar_mem"]]
     q10_syn_gbar = _q10_syn_gbar_names()[setup["Q10_gbar_syn"]]
     tau_setups = np.concatenate(
@@ -134,7 +178,7 @@ def select_names(setup: Dict = {}) -> Tuple[List, np.ndarray]:
     type_names = ["AB/PD"] * sum(setup["membrane_gbar"][0])
     type_names += ["LP"] * sum(setup["membrane_gbar"][1])
     type_names += ["PY"] * sum(setup["membrane_gbar"][2])
-    type_names += ["Synapses"] * 7
+    type_names += ["Synapses"] * sum(setup["synapses"])
     type_names += ["Q10 gbar"] * (
         sum(setup["Q10_gbar_mem"]) + sum(setup["Q10_gbar_syn"])
     )

@@ -19,6 +19,9 @@ from pyloric.utils import (
     create_neurons,
     membrane_conductances_replaced_with_defaults,
     synapses_replaced_with_defaults,
+    q10s_replaced_with_defaults,
+    build_synapse_q10s,
+    ensure_array_not_scalar,
 )
 
 
@@ -70,14 +73,16 @@ def simulate(
             [True, True, True, True, True, True, True, True],
             [True, True, True, True, True, True, True, True],
         ],
-        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
-        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
         "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
-        "Q10_tau_m": False,
-        "Q10_tau_h": False,
-        "Q10_tau_CaBuff": False,
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_tau_m": [False],
+        "Q10_tau_h": [False],
+        "Q10_tau_CaBuff": [False],
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
     }
     setup_dict.update(customization)
+    for key in setup_dict.keys():
+        setup_dict[key] = ensure_array_not_scalar(setup_dict[key])
 
     defaults_dict = {
         "membrane_gbar": [
@@ -87,108 +92,30 @@ def simulate(
         ],
         "Q10_gbar_mem": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
         "Q10_gbar_syn": [1.5, 1.5],
-        "Q10_tau_m": [1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7],
-        "Q10_tau_h": [2.8, 2.8, 2.8, 2.8],
-        "Q10_tau_CaBuff": 1.7,
+        "Q10_tau_m": [1.7],
+        "Q10_tau_h": [2.8],
+        "Q10_tau_CaBuff": [1.7],
         "Q10_tau_syn": [1.7, 1.7],
     }
     defaults_dict.update(defaults)
+    for key in defaults_dict.keys():
+        defaults_dict[key] = ensure_array_not_scalar(defaults_dict[key])
+
+    membrane_conductances_pd = membrane_conductances_replaced_with_defaults(
+        circuit_parameters, defaults_dict
+    )
+    synaptic_conductances_pd = synapses_replaced_with_defaults(
+        circuit_parameters, defaults_dict
+    )
+    q10_values_pd = q10s_replaced_with_defaults(circuit_parameters, defaults_dict)
+
+    synapse_q10_gbar = build_synapse_q10s(q10_values_pd["Q10 gbar"].to_numpy()[0, 8:10])
+    synapse_q10_tau = build_synapse_q10s(q10_values_pd["Q10 tau"].to_numpy()[0, 3:5])
+    q10_tau_m = q10_values_pd["Q10 tau"]["m"].to_numpy().tolist() * 7
+    q10_tau_h = q10_values_pd["Q10 tau"]["h"].to_numpy().tolist() * 4
+    q10_tau_cabuff = q10_values_pd["Q10 tau"]["CaBuff"].to_numpy().tolist()
 
     t = np.arange(0, t_max, dt)
-
-    membrane_conductances = membrane_conductances_replaced_with_defaults(
-        circuit_parameters, defaults_dict
-    )
-    synaptic_conductances = synapses_replaced_with_defaults(
-        circuit_parameters, defaults_dict
-    )
-    # q10_values_as_pd = ... # todo
-
-    if isinstance(circuit_parameters, pd.DataFrame):
-        circuit_parameters = circuit_parameters.to_numpy()
-
-    # define lists to loop over to assemble the parameters
-    param_classes = [
-        setup_dict["Q10_gbar_mem"],
-        setup_dict["Q10_gbar_syn"],
-        setup_dict["Q10_tau_m"],
-        setup_dict["Q10_tau_h"],
-        setup_dict["Q10_tau_CaBuff"],
-        setup_dict["Q10_tau_syn"],
-    ]
-    class_defaults = [
-        defaults_dict["Q10_gbar_mem"],
-        defaults_dict["Q10_gbar_syn"],
-        defaults_dict["Q10_tau_m"],
-        defaults_dict["Q10_tau_h"],
-        defaults_dict["Q10_tau_CaBuff"],
-        defaults_dict["Q10_tau_syn"],
-    ]
-    param_classes.reverse()
-    class_defaults.reverse()
-
-    # loop over lists
-    split_parameters = []
-    for pclass, classdefault in zip(param_classes, class_defaults):
-        if np.any(pclass):
-            split_parameters.append(circuit_parameters[-np.sum(pclass) :])
-            circuit_parameters = circuit_parameters[: -np.sum(pclass)]
-        else:
-            split_parameters.append(classdefault)
-    split_parameters.reverse()
-
-    # extend the parameter values for synapses, gbar and tau
-    # split_parameters[0][0] = gbar q10 for glutamate synapse
-    # split_parameters[0][1] = gbar q10 for cholinergic synapse
-    split_parameters[0] = [
-        split_parameters[0][0],
-        split_parameters[0][1],
-        split_parameters[0][0],
-        split_parameters[0][1],
-        split_parameters[0][0],
-        split_parameters[0][0],
-        split_parameters[0][0],
-    ]  # gbar of synapses
-    split_parameters[1] = [
-        split_parameters[1][0],
-        split_parameters[1][1],
-        split_parameters[1][0],
-        split_parameters[1][1],
-        split_parameters[1][0],
-        split_parameters[1][0],
-        split_parameters[1][0],
-    ]  # tau of synapses
-
-    # extend the parameter values for tau_m and tau_h
-    if isinstance(setup_dict["Q10_tau_m"], bool):
-        split_parameters[3] = np.tile([split_parameters[3]], 8).flatten()
-    if isinstance(setup_dict["Q10_tau_h"], bool):
-        split_parameters[4] = np.tile([split_parameters[4]], 4).flatten()
-
-    # get the conductance params
-    conductance_params = circuit_parameters  # membrane and synapse gbar
-
-    assert conductance_params.ndim == 1, "params.ndim must be 1"
-
-    membrane_conductances = conductance_params[0:-7]
-    synaptic_conductances = np.exp(conductance_params[-7:])
-    conns = build_conns(-synaptic_conductances)
-
-    # build the used membrane conductances as parameters. Rest as fixed values.
-    current_num = 0
-    membrane_conds = []
-    for neuron_num in range(3):  # three neurons
-        membrane_cond = []
-        for cond_num in range(8):  # 8 membrane conductances per neuron
-            if setup_dict["membrane_gbar"][neuron_num][cond_num]:
-                membrane_cond.append(membrane_conductances[current_num])
-                current_num += 1
-            else:
-                membrane_cond.append(neurons[neuron_num][cond_num])
-        membrane_conds.append(np.asarray(membrane_cond))
-
-    if isinstance(split_parameters[5], float):
-        split_parameters[5] = [split_parameters[5]]
 
     # note: make sure to generate all randomness through self.rng (!)
     if seed is not None:
@@ -197,25 +124,18 @@ def simulate(
         rng = np.random.RandomState()
     I = rng.normal(scale=noise_std, size=(3, len(t)))
 
-    # print("g_q10_conns_gbar", split_parameters[0])
-    # print("g_q10_conns_tau", split_parameters[1])
-    # print("g_q10_memb_gbar", split_parameters[2])
-    # print("g_q10_memb_tau_m", split_parameters[3])
-    # print("g_q10_memb_tau_h", split_parameters[4])
-    # print("g_q10_memb_tau_CaBuff", split_parameters[5])
-
     data = sim_time(
         dt,
         t,
         I,
-        membrane_conds,  # membrane conductances
-        conns,  # synaptic conductances (always variable)
-        g_q10_conns_gbar=split_parameters[0],
-        g_q10_conns_tau=split_parameters[1],
-        g_q10_memb_gbar=split_parameters[2],
-        g_q10_memb_tau_m=split_parameters[3],
-        g_q10_memb_tau_h=split_parameters[4],
-        g_q10_memb_tau_CaBuff=split_parameters[5],
+        np.reshape(membrane_conductances_pd.to_numpy(), (3, 8)),
+        build_conns(-np.exp(synaptic_conductances_pd.to_numpy()[0])),
+        g_q10_conns_gbar=synapse_q10_gbar,
+        g_q10_conns_tau=synapse_q10_tau,
+        g_q10_memb_gbar=q10_values_pd["Q10 gbar"].to_numpy()[0, :8],
+        g_q10_memb_tau_m=q10_tau_m,
+        g_q10_memb_tau_h=q10_tau_h,
+        g_q10_memb_tau_CaBuff=q10_tau_cabuff,
         temp=temperature,
         num_energy_timesteps=len(t) if track_energy else 0,
         num_energyscape_timesteps=len(t) if track_currents else 0,
