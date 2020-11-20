@@ -20,9 +20,9 @@ summary_statistics = stats(simulation_output)
 ```
 
 ### Units
-All conductances are in mS / $\text{cm}^2$.  
+All conductances are in mS / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
 All voltages are in mV.  
-All energies are in nJ / $\text{cm}^2$.  
+All energies are in nJ / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
 All times are in milliseconds.  
 
 ### License
