@@ -146,19 +146,19 @@ class PrinzStats:
             "ends_to_starts",
             "phase_gaps",
             "plateau_durations",
-            "pyloric_like",
-            "energies_per_spike",
-            "num_bursts",
-            "energies_per_burst",
-            "energies",
-            "num_spikes",
             "voltage_means",
             "voltage_stds",
             "voltage_skews",
             "voltage_kurtoses",
+            "num_bursts",
+            "num_spikes",
             "spike_times",
             "spike_heights",
             "rebound_times",
+            "energies",
+            "energies_per_burst",
+            "energies_per_spike",
+            "pyloric_like",
         ]
 
         new_dict = {}
@@ -577,10 +577,12 @@ class PrinzStats:
             burst_durations[nt] = single_neuron_stats[nt]["avg_burst_length"]
             duty_cycles[nt] = burst_durations[nt] / single_neuron_stats["cycle_period"]
             plateau_durations[nt] = single_neuron_stats[nt]["plateau_durations"]
-            energy[nt] = single_neuron_stats[nt]["energies_per_spike"]
+            energy[nt] = single_neuron_stats[nt]["energies_per_spike"] / 1000 * dt
             num_bursts[nt] = single_neuron_stats[nt]["num_bursts"]
-            energy_per_burst[nt] = single_neuron_stats[nt]["energies_per_burst"]
-            total_energy[nt] = single_neuron_stats[nt]["energies"]
+            energy_per_burst[nt] = (
+                single_neuron_stats[nt]["energies_per_burst"] / 1000 * dt
+            )
+            total_energy[nt] = single_neuron_stats[nt]["energies"] / 1000 * dt
             num_spikes[nt] = single_neuron_stats[nt]["num_spikes"]
             spike_times[nt] = single_neuron_stats[nt]["spike_times"]
             spike_heights[nt] = single_neuron_stats[nt]["spike_heights"]
