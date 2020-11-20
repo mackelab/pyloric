@@ -19,6 +19,11 @@ simulation_output = simulate(parameter_set.loc[0])
 summary_statistics = stats(simulation_output)
 ```
 
+### Units
+All conductances are in mS / $\text{cm}^2$.  
+All voltages are in mV.  
+All energies are in nJ / $\text{cm}^2$.  
+All times are in milliseconds.  
 
 ### License
 MIT
