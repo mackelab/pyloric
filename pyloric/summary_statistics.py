@@ -170,7 +170,7 @@ class PrinzStats:
         for key in keys:
             if self.setup[key]:
                 new_dict[key] = stats[key]
-                if isinstance(stats[key], float):
+                if isinstance(stats[key], float) or isinstance(stats[key], bool):
                     general_names += [key]
                     specific_names += ["Circuit"]
                     all_data += [stats[key]]
