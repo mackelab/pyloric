@@ -1,9 +1,12 @@
-import numpy as np
 import os
-from typing import Optional, Dict, Union
-import pyximport
+from typing import Dict, Optional, Union
+
 import numpy
+import numpy as np
 import pandas as pd
+import torch
+
+import pyximport
 
 # setup_args needed on my MacOS
 pyximport.install(
@@ -12,17 +15,92 @@ pyximport.install(
     language_level=3,
 )
 
+from pyloric.prior import prior_bounds, select_names
 from pyloric.simulator import sim_time
 from pyloric.summary_statistics import PrinzStats
 from pyloric.utils import (
     build_conns,
-    create_neurons,
-    membrane_conductances_replaced_with_defaults,
-    synapses_replaced_with_defaults,
-    q10s_replaced_with_defaults,
     build_synapse_q10s,
+    create_neurons,
     ensure_array_not_scalar,
+    membrane_conductances_replaced_with_defaults,
+    q10s_replaced_with_defaults,
+    synapses_replaced_with_defaults,
 )
+from sbi.utils import BoxUniform
+
+
+def create_prior(
+    lower_bound: Optional[np.ndarray] = None,
+    upper_bound: Optional[np.ndarray] = None,
+    customization: Dict = {},
+    synapses_log_space: bool = True,
+) -> "pd_prior":
+    """
+    Return prior over circuit parameters of the pyloric network.
+
+    Args:
+        lower_bound: Lower bound of the prior. If `None`, use the values used in
+            Goncalves et al. 2020. If passed, it must be a 1D array with as many
+            elements as `True` values in `customization`.
+        upper_bound: Upper bound of the prior. If `None`, use the values used in
+            Goncalves et al. 2020. If passed, it must be a 1D array with as many
+            elements as `True` values in `customization`.
+        customization: If you want to exclude some of the circuit_parameters and use
+            constant default values for them, you have to set these entries to `False`
+            in the `membrane_gbar` key in the `customization` dictionary. If you want
+            to include $Q_{10}$ values, you have to set them in this dictionary.
+        synapses_log_space: Whether the synapses will be uniformly distributed in
+            logarithmic space or not (=in linear space).
+
+    Returns:
+        A uniform prior distribution.
+    """
+
+    setups = {
+        "membrane_gbar": [
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+            [True, True, True, True, True, True, True, True],
+        ],
+        "Q10_gbar_mem": [False, False, False, False, False, False, False, False],
+        "Q10_gbar_syn": [False, False],  # first for glutamate, second for choline
+        "Q10_tau_m": [False],
+        "Q10_tau_h": [False],
+        "Q10_tau_CaBuff": [False],
+        "Q10_tau_syn": [False, False],  # first for glutamate, second for choline
+    }
+    setups.update(customization)
+    for key in setups.keys():
+        setups[key] = ensure_array_not_scalar(setups[key])
+
+    l_bound, u_bound = prior_bounds(setups, synapses_log_space=synapses_log_space)
+    if lower_bound is None:
+        lower_bound = l_bound
+    if upper_bound is None:
+        upper_bound = u_bound
+    type_names, channel_names = select_names(setups)
+
+    class pd_prior:
+        """Wrapper for the pytorch prior such that it returns pandas samples."""
+
+        def __init__(self, lower, upper, parameter_names):
+            self.lower = torch.tensor(lower)
+            self.upper = torch.tensor(upper)
+            self.names = parameter_names
+            self.numerical_prior = BoxUniform(self.lower, self.upper)
+
+        def sample(self, sample_shape):
+            numerical_sample = self.numerical_prior.sample(sample_shape).numpy()
+            return pd.DataFrame(numerical_sample, columns=self.names)
+
+        def log_prob(self, theta):
+            numerical_theta = theta.to_numpy()
+            return self.numerical_prior.log_prob(numerical_theta)
+
+    prior = pd_prior(lower_bound, upper_bound, [type_names, channel_names])
+
+    return prior
 
 
 def simulate(

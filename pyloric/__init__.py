@@ -1,2 +1,1 @@
-from pyloric.sbi_wrapper import simulate, stats
-from pyloric.prior import create_prior
+from pyloric.interface import create_prior, simulate, stats
