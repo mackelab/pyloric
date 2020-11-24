@@ -1,4 +1,4 @@
-from pyloric import create_prior, simulate, stats
+from pyloric import create_prior, simulate, summary_stats
 import pytest
 import torch
 import numpy as np
@@ -9,7 +9,7 @@ def test_simulator():
     torch.manual_seed(0)
     p = prior.sample((1,))
     sim_out = simulate(p.loc[0], seed=0)
-    ss = stats(sim_out)
+    ss = summary_stats(sim_out)
     ground_truth = np.asarray(
         [1275.5107, 180.5469, 433.2531, 279.2781, 0.1415, 0.3397, 0.2190,]
     )
@@ -31,7 +31,7 @@ def test_temperature(temperature):
     torch.manual_seed(12)
     p = prior.sample((1,))
     sim_out = simulate(p.loc[0], seed=0, temperature=temperature)
-    ss = stats(sim_out)
+    ss = summary_stats(sim_out)
     if temperature == 283:
         ground_truth = np.asarray([701.5107, 93.3317])
     else:
@@ -45,7 +45,7 @@ def test_advanced_summstats():
     torch.manual_seed(2)
     p = prior.sample((1,))
     sim_out = simulate(p.loc[0], seed=1, track_energy=True)
-    ss = stats(
+    ss = summary_stats(
         sim_out,
         stats_customization={
             "cycle_period": True,

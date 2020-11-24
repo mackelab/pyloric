@@ -1,1 +1,1 @@
-from pyloric.interface import create_prior, simulate, stats
+from pyloric.interface import create_prior, simulate, summary_stats

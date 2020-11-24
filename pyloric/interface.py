@@ -234,7 +234,7 @@ def simulate(
     return results_dict
 
 
-def stats(
+def summary_stats(
     simulation_outputs: Dict, stats_customization: Dict = {}, t_burn_in=1000
 ) -> pd.DataFrame:
     """
