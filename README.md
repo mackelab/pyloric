@@ -1,5 +1,5 @@
 # pyloric
-Simulator of the pyloric network in the stomatogastric ganglion (STG) in cython.
+Simulator of the pyloric network in the stomatogastric ganglion (STG) in python. The solver for the differential equations is implemented in cython.
 
 The model was proposed in Prinz, Bucher, Marder, Nature Neuroscience, 2004.
 
