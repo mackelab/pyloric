@@ -606,14 +606,14 @@ class PrinzStats:
                     list_es = [
                         e[nt2][0] - e[nt][1] for e in single_neuron_stats["period_data"]
                     ]
-                    ends_to_starts[nt, nt2] = list_es if list_es else nan
+                    ends_to_starts[nt, nt2] = np.mean(list_es) if list_es else nan
                     phase_gaps[nt, nt2] = (
                         ends_to_starts[nt, nt2] / single_neuron_stats["cycle_period"]
                     )
                     list_ss = [
                         e[nt2][0] - e[nt][0] for e in single_neuron_stats["period_data"]
                     ]
-                    starts_to_starts[nt, nt2] = list_ss if list_ss else nan
+                    starts_to_starts[nt, nt2] = np.mean(list_ss) if list_ss else nan
 
                 start_phases[nt] = (
                     starts_to_starts[neuron_types[0], nt]
