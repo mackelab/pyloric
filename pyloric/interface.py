@@ -35,6 +35,7 @@ def create_prior(
     upper_bound: Optional[np.ndarray] = None,
     customization: Dict = {},
     synapses_log_space: bool = True,
+    as_torch_dist: bool = False,
 ) -> "pd_prior":
     """
     Return prior over circuit parameters of the pyloric network.
@@ -52,6 +53,8 @@ def create_prior(
             to include $Q_{10}$ values, you have to set them in this dictionary.
         synapses_log_space: Whether the synapses will be uniformly distributed in
             logarithmic space or not (=in linear space).
+        as_torch_dist: If `False`, the prior will be wrapped to return pandas
+            dataframes as samples. If `True`, the samples will be pytorch tensors.
 
     Returns:
         A uniform prior distribution.
@@ -100,7 +103,10 @@ def create_prior(
 
     prior = pd_prior(lower_bound, upper_bound, [type_names, channel_names])
 
-    return prior
+    if as_torch_dist:
+        return prior.numerical_prior
+    else:
+        return prior
 
 
 def simulate(
