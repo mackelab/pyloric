@@ -2,6 +2,7 @@ from pyloric import create_prior, simulate, summary_stats
 import pytest
 import torch
 import numpy as np
+import pandas as pd
 
 
 def test_simulator():
@@ -72,8 +73,6 @@ def test_advanced_summstats():
         },
     )
 
-    print(ss.to_numpy()[0, :7])
-
     gt = [810.3958, 75.4423, 73.3750, 170.7275, 0.0931, 0.0905, 0.2107]
     assert np.all(np.abs(ss.to_numpy()[0, :7] - gt) < 1e-3)
 
@@ -107,3 +106,112 @@ def test_advanced_summstats():
         np.abs(ss["energies_per_spike"].to_numpy()[0] - energies_per_spike) < 1e-3
     )
     assert not ss["pyloric_like"].to_numpy()[0]
+
+
+def test_valid_simulation():
+    circuit_parameters = np.asarray(
+        [
+            [
+                2.86921725e02,
+                9.75099899e-02,
+                5.53758392e00,
+                2.17553840e01,
+                1.21938578e01,
+                1.23777092e02,
+                9.64585042e-03,
+                5.16584517e-03,
+                1.67802913e02,
+                9.94858342e-01,
+                7.71058188e00,
+                1.92827439e01,
+                7.30915903e00,
+                4.33907960e01,
+                5.03816170e-02,
+                2.12142250e-02,
+                4.77249899e02,
+                5.10924385e00,
+                7.13955321e-01,
+                3.96705037e01,
+                4.89271588e00,
+                5.92566636e01,
+                5.51743568e-02,
+                1.21729756e-02,
+                -1.08318439e01,
+                -1.05837408e01,
+                -1.38916890e01,
+                -9.07825715e00,
+                -8.90034224e00,
+                -1.57819342e01,
+                -7.23973359e00,
+            ]
+        ]
+    )
+
+    p1 = create_prior()
+    pars = p1.sample((1,))
+    column_names = pars.columns
+
+    parameter_set_pd = pd.DataFrame(circuit_parameters, columns=column_names)
+
+    sim = simulate(
+        parameter_set_pd.loc[0],
+        seed=5340,
+        dt=0.025,
+        t_max=11000,
+        temperature=283,
+        noise_std=0.001,
+        track_energy=True,
+    )
+    custom_stats = {
+        "plateau_durations": True,
+        "num_bursts": True,
+        "num_spikes": True,
+        "energies": True,
+        "energies_per_burst": True,
+        "energies_per_spike": True,
+        "pyloric_like": True,
+    }
+    ss1 = summary_stats(sim, stats_customization=custom_stats, t_burn_in=1000)
+
+    stats_gt = np.asarray(
+        [
+            9.82763889e02,
+            9.51450000e01,
+            1.96325000e02,
+            9.00375000e01,
+            9.68136915e-02,
+            1.99768227e-01,
+            9.16166141e-02,
+            4.32694074e-01,
+            6.65015051e-01,
+            4.25236111e02,
+            2.28316667e02,
+            3.32486111e02,
+            2.39500000e01,
+            3.38317387e-01,
+            2.43700448e-02,
+            2.50000000e00,
+            9.32500000e00,
+            2.50000000e00,
+            1.00000000e01,
+            1.00000000e01,
+            1.00000000e01,
+            3.60000000e01,
+            1.86000000e02,
+            4.70000000e01,
+            1.10541733e04,
+            4.33217606e04,
+            2.36869438e04,
+            1.02694746e03,
+            4.26833819e03,
+            2.27921812e03,
+            2.85263184e02,
+            2.29480548e02,
+            4.84940026e02,
+            1.00000000e00,
+        ]
+    )
+
+    stats_sim = ss1.to_numpy()[0]
+
+    assert np.all(np.abs((stats_sim - stats_gt) / stats_gt) < 3e-3)
