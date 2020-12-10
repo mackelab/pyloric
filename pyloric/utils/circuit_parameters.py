@@ -2,6 +2,7 @@ import numpy as np
 from typing import Dict, Tuple, Optional, List
 import pandas as pd
 from torch import Tensor
+from typing import Union
 
 
 def create_neurons(neuron_list):
