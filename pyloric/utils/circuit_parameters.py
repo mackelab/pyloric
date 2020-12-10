@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, Tuple, Optional, List
 import pandas as pd
+from torch import Tensor
 
 
 def create_neurons(neuron_list):
@@ -209,3 +210,55 @@ def _q10_syn_gbar_names():
 
 def _q10_tau_names():
     return np.asarray(["m", "h", "CaBuff", "Glut", "Chol"])
+
+
+def pyloric_to_pd(circuit_parameters: Union[Tensor, np.ndarray]):
+    """
+    Take an array and return the pandas DataFrame that can be passed to `simulate()`.
+
+    This function will only work if `circuit_parameters` contains the 31 most basic
+    parameters (8*3 membrane conductances and 7 synaptic conductances).
+    """
+    columns = (
+        ("AB/PD", "Na"),
+        ("AB/PD", "CaT"),
+        ("AB/PD", "CaS"),
+        ("AB/PD", "A"),
+        ("AB/PD", "KCa"),
+        ("AB/PD", "Kd"),
+        ("AB/PD", "H"),
+        ("AB/PD", "Leak"),
+        ("LP", "Na"),
+        ("LP", "CaT"),
+        ("LP", "CaS"),
+        ("LP", "A"),
+        ("LP", "KCa"),
+        ("LP", "Kd"),
+        ("LP", "H"),
+        ("LP", "Leak"),
+        ("PY", "Na"),
+        ("PY", "CaT"),
+        ("PY", "CaS"),
+        ("PY", "A"),
+        ("PY", "KCa"),
+        ("PY", "Kd"),
+        ("PY", "H"),
+        ("PY", "Leak"),
+        ("Synapses", "AB-LP"),
+        ("Synapses", "PD-LP"),
+        ("Synapses", "AB-PY"),
+        ("Synapses", "PD-PY"),
+        ("Synapses", "LP-PD"),
+        ("Synapses", "LP-PY"),
+        ("Synapses", "PY-LP"),
+    )
+
+    if isinstance(circuit_parameters, Tensor):
+        pd_params = pd.DataFrame(circuit_parameters.detach().numpy(), columns=columns)
+    else:
+        circuit_parameters = np.asarray(circuit_parameters)
+        if circuit_parameters.ndim == 1:
+            circuit_parameters = np.asarray([circuit_parameters])
+        pd_params = pd.DataFrame(circuit_parameters, columns=columns)
+
+    return pd_params
