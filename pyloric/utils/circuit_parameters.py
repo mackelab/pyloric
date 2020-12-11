@@ -213,7 +213,7 @@ def _q10_tau_names():
     return np.asarray(["m", "h", "CaBuff", "Glut", "Chol"])
 
 
-def pyloric_to_pd(circuit_parameters: Union[Tensor, np.ndarray]):
+def to_pyloric_pd(circuit_parameters: Union[Tensor, np.ndarray]):
     """
     Take an array and return the pandas DataFrame that can be passed to `simulate()`.
 
