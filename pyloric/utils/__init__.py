@@ -8,6 +8,6 @@ from pyloric.utils.circuit_parameters import (
     synapses_replaced_with_defaults,
     q10s_replaced_with_defaults,
     build_synapse_q10s,
-    pyloric_to_pd,
+    to_pyloric_pd,
 )
 from pyloric.utils.analysis import energy_of_membrane, energy_of_synapse
