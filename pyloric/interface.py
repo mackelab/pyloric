@@ -176,9 +176,9 @@ def simulate(
         ],
         "Q10_gbar_mem": [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
         "Q10_gbar_syn": [1.5, 1.5],
-        "Q10_tau_m": [1.7],
+        "Q10_tau_m": [2.4],
         "Q10_tau_h": [2.8],
-        "Q10_tau_CaBuff": [1.7],
+        "Q10_tau_CaBuff": [2.0],
         "Q10_tau_syn": [1.7, 1.7],
     }
     defaults_dict.update(defaults)
@@ -199,6 +199,12 @@ def simulate(
     q10_tau_m = q10_values_pd["Q10 tau"]["m"].to_numpy().tolist() * 7
     q10_tau_h = q10_values_pd["Q10 tau"]["h"].to_numpy().tolist() * 4
     q10_tau_cabuff = q10_values_pd["Q10 tau"]["CaBuff"].to_numpy().tolist()
+
+    # The Q10 of the opening gate of CaS is set. (Caplan 2014)
+    q10_tau_m[2] = 2.0
+
+    # The Q10 of the opening gate of KCa is set. (Caplan 2014)
+    q10_tau_m[4] = 1.6
 
     t = np.arange(0, t_max, dt)
 
