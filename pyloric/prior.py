@@ -34,7 +34,13 @@ def prior_bounds(
     tau_min = 1.0
     tau_max = 4.0
 
-    q10_mem_gbar_l, q10_mem_gbar_u = _select(g_min, g_max, setups["Q10_gbar_mem"])
+    hyperpolariation_cond = np.asarray([setups["Q10_gbar_mem"][6]])
+    other_conds1 = np.asarray(setups["Q10_gbar_mem"][[0, 1, 2, 3, 4, 5]])
+    other_conds2 = np.asarray([setups["Q10_gbar_mem"][7]])
+
+    q10_mem_gbar_lh, q10_mem_gbar_uh = _select(1.0, 4.0, hyperpolariation_cond)
+    q10_mem_gbar_l1, q10_mem_gbar_u1 = _select(g_min, g_max, other_conds1)
+    q10_mem_gbar_l2, q10_mem_gbar_u2 = _select(g_min, g_max, other_conds2)
     q10_syn_gbar_l, q10_syn_gbar_u = _select(g_min, g_max, setups["Q10_gbar_syn"])
     q10_tau_m_l, q10_tau_m_u = _select(tau_min, tau_max, setups["Q10_tau_m"])
     q10_tau_h_l, q10_tau_h_u = _select(tau_min, tau_max, setups["Q10_tau_h"])
@@ -45,7 +51,9 @@ def prior_bounds(
         (
             gbar_l,
             syn_l,
-            q10_mem_gbar_l,
+            q10_mem_gbar_l1,
+            q10_mem_gbar_lh,
+            q10_mem_gbar_l2,
             q10_syn_gbar_l,
             q10_tau_m_l,
             q10_tau_h_l,
@@ -57,7 +65,9 @@ def prior_bounds(
         (
             gbar_u,
             syn_u,
-            q10_mem_gbar_u,
+            q10_mem_gbar_u1,
+            q10_mem_gbar_uh,
+            q10_mem_gbar_u2,
             q10_syn_gbar_u,
             q10_tau_m_u,
             q10_tau_h_u,
