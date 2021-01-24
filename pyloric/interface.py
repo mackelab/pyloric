@@ -91,7 +91,7 @@ def create_prior(
             self.lower = torch.tensor(lower)
             self.upper = torch.tensor(upper)
             self.names = parameter_names
-            self.numerical_prior = BoxUniform(self.lower, self.upper)
+            self.numerical_prior = BoxUniform(torch.as_tensor(self.lower, dtype=torch.float32), torch.as_tensor(self.upper, dtype=torch.float32))
 
         def sample(self, sample_shape):
             numerical_sample = self.numerical_prior.sample(sample_shape).numpy()
