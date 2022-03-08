@@ -33,5 +33,17 @@ All voltages are in mV.
 All energies are in nJ / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
 All times are in milliseconds.  
 
+### Citation
+If you are using this similator, please cite the corresponding paper:
+```
+@article{deistler2021disparate,
+  title={Disparate energy consumption despite similar network activity},
+  author={Deistler, Michael and Macke, Jakob H and Gon{\c{c}}alves, Pedro J},
+  journal={bioRxiv},
+  year={2021},
+  publisher={Cold Spring Harbor Laboratory}
+}
+```
+
 ### License
 MIT
