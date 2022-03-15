@@ -44,6 +44,7 @@ def sim_time(
     dtype temp,
     num_energy_timesteps: int,
     num_energyscape_timesteps: int,
+    energy_measure: str = "power",
     init = None,
     start_val_input=0.0,
     bint verbose = True
@@ -62,6 +63,11 @@ def sim_time(
         num_energy_timesteps: Until which time step the energy should be stored. The
             vector that stores the energy has as many entries as time steps to be
             stored. Hence, if `num_energy_timesteps=0` the memory costs are smaller.
+        energy_measure: The way in which energy consumption is computed. Either of
+            `["power", "current"]`. If `"power"`, the energy is computed as described in
+            Moujahid et al. 2011, APS. If `"current"`, the energy is computed by 
+            summing the sodium and calcium currents and correcting for the efficiency 
+            of the respective pumps. In summary: E = c_Na / 3 + c_CaT / 4 + c_CaS / 4
         init: Whether to use a custom initialization for the gating variables. If not
             `None`, set the initial values for voltage, Ca concentration and state
             variables.
@@ -349,12 +355,20 @@ def sim_time(
             csx[npost] += -conns[k,2] * sx[k, i-1]                  # positive currents inhibit spiking in our model
             Icsx[npost] += -conns[k,2] * sx[k, i-1] * conns[k,3]   # mS * 1 * mV = muA
 
+        # Compute synaptic energy.
         if i < num_energy_timesteps:
             for k in range(m): # m = len(conns)
                 npost = int(conns[k,0])
-                current_synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
-                if current_synaptic_energy[npost] < 0.0:
-                    print('problem, synaptic cost < 0.0!')
+                if energy_measure == "power":
+                    current_synaptic_energy[npost] += -conns[k,2] * sx[k, i-1] * (Vx[npost, i-1] - conns[k,3]) ** 2
+                    if current_synaptic_energy[npost] < 0.0:
+                        print('problem, synaptic cost < 0.0!')
+                elif energy_measure == "current":
+                    current_synaptic_energy[npost] += 0.0
+                else:
+                    raise NotImplementedError
+
+        # Log synaptic conductances.
         if i < num_energyscape_timesteps:
             for k in range(m): # m = len(conns)
                 cond_syn[k, i] = -conns[k,2] * sx[k, i-1]
@@ -373,15 +387,22 @@ def sim_time(
 
             # store energy in vector
             if i < num_energy_timesteps:
-                # instantaneous energy stemming from membrane currents
-                current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
-                    cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                    cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
-                    cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                    cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
-                    cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
-                    cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
-                    cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
+                if energy_measure == "power":
+                    # instantaneous energy stemming from membrane currents
+                    current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) ** 2 +\
+                        cCaTx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                        cCaSx[j] * (Vx[j, i-1] - ECax[j]) ** 2 +\
+                        cAx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                        cKCax[j] * (Vx[j, i-1] - EK) ** 2 +\
+                        cKdx[j] * (Vx[j, i-1] - EK) ** 2 +\
+                        cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
+                        cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
+                elif energy_measure == "current":
+                    current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) +\
+                        cCaTx[j] * (Vx[j, i-1] - ECax[j]) +\
+                        cCaSx[j] * (Vx[j, i-1] - ECax[j])
+                else:
+                    raise NotImplementedError
 
                 # add energy from the synapses
                 current_energy[j] = current_energy[j] + current_synaptic_energy[j]
@@ -488,5 +509,6 @@ def sim_time(
         'membrane_conds': membrane_conds / (0.628*1e-3),
         'synaptic_conds': cond_syn / (0.628*1e-3),
         'reversal_calcium': reversal_calcium,
+        'n_Kd': mKdx
     }
     return ret

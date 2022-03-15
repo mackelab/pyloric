@@ -91,7 +91,10 @@ def create_prior(
             self.lower = torch.tensor(lower)
             self.upper = torch.tensor(upper)
             self.names = parameter_names
-            self.numerical_prior = BoxUniform(torch.as_tensor(self.lower, dtype=torch.float32), torch.as_tensor(self.upper, dtype=torch.float32))
+            self.numerical_prior = BoxUniform(
+                torch.as_tensor(self.lower, dtype=torch.float32),
+                torch.as_tensor(self.upper, dtype=torch.float32),
+            )
 
         def sample(self, sample_shape):
             numerical_sample = self.numerical_prior.sample(sample_shape).numpy()
@@ -242,6 +245,7 @@ def simulate(
         results_dict.update({"membrane_conds": data["membrane_conds"]})
         results_dict.update({"synaptic_conds": data["synaptic_conds"]})
         results_dict.update({"reversal_calcium": data["reversal_calcium"]})
+        results_dict.update({"n_Kd": data["n_Kd"]})
 
     return results_dict
 
