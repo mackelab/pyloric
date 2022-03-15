@@ -12,11 +12,11 @@ pip install .
 
 ### Usage
 ```
-from pyloric import simulate, create_prior, stats
+from pyloric import simulate, create_prior, summary_stats
 prior = create_prior()
 parameter_set = prior.sample((1,))
 simulation_output = simulate(parameter_set.loc[0])
-summary_statistics = stats(simulation_output)
+summary_statistics = summary_stats(simulation_output)
 ```
 
 ### Features

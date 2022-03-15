@@ -113,13 +113,14 @@ def create_prior(
 
 
 def simulate(
-    circuit_parameters: Union[np.array, pd.DataFrame],
+    circuit_parameters: Union[np.ndarray, pd.DataFrame],
     dt: float = 0.025,
     t_max: int = 11000,
     temperature: int = 283,
     noise_std: float = 0.001,
     track_energy: bool = False,
     track_currents: bool = False,
+    energy_measure: str = "power",
     seed: Optional[int] = None,
     customization: Dict = {},
     defaults: Dict = {},
@@ -233,6 +234,7 @@ def simulate(
         temp=temperature,
         num_energy_timesteps=len(t) if track_energy else 0,
         num_energyscape_timesteps=len(t) if track_currents else 0,
+        energy_measure=energy_measure,
         init=None,
         start_val_input=0.0,
         verbose=False,

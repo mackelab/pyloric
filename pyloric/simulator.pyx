@@ -398,9 +398,9 @@ def sim_time(
                         cHx[j] * (Vx[j, i-1] - EH) ** 2 +\
                         cleakx[j] * (Vx[j, i-1] - Eleak) ** 2
                 elif energy_measure == "current":
-                    current_energy[j] = cNax[j] * (Vx[j, i-1] - ENa) +\
-                        cCaTx[j] * (Vx[j, i-1] - ECax[j]) +\
-                        cCaSx[j] * (Vx[j, i-1] - ECax[j])
+                    current_energy[j] = abs(cNax[j] * (Vx[j, i-1] - ENa)) / 3 +\
+                        abs(cCaTx[j] * (Vx[j, i-1] - ECax[j])) / 4 +\
+                        abs(cCaSx[j] * (Vx[j, i-1] - ECax[j])) / 4
                 else:
                     raise NotImplementedError
 
