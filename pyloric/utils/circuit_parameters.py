@@ -45,6 +45,7 @@ def create_neurons(neuron_list):
 
 
 def membrane_conductances_replaced_with_defaults(circuit_parameters, defaults_dict):
+    """Returns the membrane conductances in milli Siemens."""
     default_neurons = create_neurons(defaults_dict["membrane_gbar"])
     default_neurons = np.reshape(default_neurons, (1, 24))
     type_names, cond_names = select_names()
@@ -58,6 +59,7 @@ def membrane_conductances_replaced_with_defaults(circuit_parameters, defaults_di
 
 
 def synapses_replaced_with_defaults(circuit_parameters, defaults_dict):
+    """Returns the synapses in log(milli Siemens)."""
     type_names, cond_names = select_names()
     type_names = type_names[24:]
     cond_names = cond_names[24:]

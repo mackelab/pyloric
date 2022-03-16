@@ -194,7 +194,7 @@ def simulate(
     )
     synaptic_conductances_pd = synapses_replaced_with_defaults(
         circuit_parameters, defaults_dict
-    )
+    )  # unit: log(mS)
     q10_values_pd = q10s_replaced_with_defaults(circuit_parameters, defaults_dict)
 
     membrane_q10_gbar = q10_values_pd["Q10 gbar"].to_numpy()[0, :8]
@@ -219,12 +219,14 @@ def simulate(
         rng = np.random.RandomState()
     I = rng.normal(scale=noise_std, size=(3, len(t)))
 
+    # Convert conductances from log(mS) to mS.
+    conns = build_conns(-np.exp(synaptic_conductances_pd.to_numpy()[0]))
     data = sim_time(
         dt,
         t,
         I,
         np.reshape(membrane_conductances_pd.to_numpy(), (3, 8)),
-        build_conns(-np.exp(synaptic_conductances_pd.to_numpy()[0])),
+        conns_=conns,
         g_q10_conns_gbar=synapse_q10_gbar,
         g_q10_conns_tau=synapse_q10_tau,
         g_q10_memb_gbar=membrane_q10_gbar,

@@ -28,7 +28,8 @@ summary_statistics = summary_stats(simulation_output)
 - calculation of energy consumption of the circuit.
 
 ### Units
-All conductances are in mS / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
+All membrane conductances are in mS / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
+All synaptic conductances are in log(mS) (natural log).
 All voltages are in mV.  
 All energies are in nJ / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
 All times are in milliseconds.  
