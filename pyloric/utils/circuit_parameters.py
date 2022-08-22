@@ -115,25 +115,25 @@ def build_synapse_q10s(vec):
     return np.asarray([vec[0], vec[1], vec[0], vec[1], vec[0], vec[0], vec[0]])
 
 
-def build_conns(params):
+def build_conns(
+    params,
+    Esglut=[-70, -70, -70, -70, -70],
+    kminusglut=[40, 40, 40, 40, 40],
+    Eschol=[-80, -80],
+    kminuschol=[100, 100],
+):
 
     # Reversal voltages and dissipation time constants for the synapses, taken from
     # Prinz 2004, p. 1351
-    Esglut = -70  # mV
-    kminusglut = 40  # ms
-
-    Eschol = -80  # mV
-    kminuschol = 100  # ms
-
     return np.asarray(
         [
-            [1, 0, params[0], Esglut, kminusglut],
-            [1, 0, params[1], Eschol, kminuschol],
-            [2, 0, params[2], Esglut, kminusglut],
-            [2, 0, params[3], Eschol, kminuschol],
-            [0, 1, params[4], Esglut, kminusglut],
-            [2, 1, params[5], Esglut, kminusglut],
-            [1, 2, params[6], Esglut, kminusglut],
+            [1, 0, params[0], Esglut[0], kminusglut[0]],
+            [1, 0, params[1], Eschol[0], kminuschol[0]],
+            [2, 0, params[2], Esglut[1], kminusglut[1]],
+            [2, 0, params[3], Eschol[1], kminuschol[1]],
+            [0, 1, params[4], Esglut[2], kminusglut[2]],
+            [2, 1, params[5], Esglut[3], kminusglut[3]],
+            [1, 2, params[6], Esglut[4], kminusglut[4]],
         ]
     )
 

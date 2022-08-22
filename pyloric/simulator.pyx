@@ -47,7 +47,9 @@ def sim_time(
     energy_measure: str = "power",
     init = None,
     start_val_input=0.0,
-    bint verbose = True
+    bint verbose = True,
+    Vth=np.asarray([-35, -35, -35, -35, -35, -35, -35]),
+    Delta=np.asarray([5, 5, 5, 5, 5, 5, 5]),
 ):
     """
     Simulates the model for a specified time duration.
@@ -89,12 +91,6 @@ def sim_time(
     cdef np.ndarray[dtype] IKCadata    = np.asarray([ 4   , 28.3  , -12.6 , Nval  , Nval  , 180.6 , -150.2, 46    , -22.7 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IKddata     = np.asarray([ 4   , 12.3  , -11.8 , Nval  , Nval  , 14.4  , -12.8 , 28.3  , -19.2 , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
     cdef np.ndarray[dtype] IHdata      = np.asarray([ 1   , 75    , 5.5   , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  , Nval  ])
-
-    cdef dtype Esglut = -70
-    cdef dtype kminusglut = 40
-
-    cdef dtype Eschol = -80
-    cdef dtype kminuschol = 100
 
     # Q10s for synapses
     cdef np.ndarray[dtype, ndim=1] g_temp_factor_conns   = np.asarray(g_q10_conns_gbar) ** ((temp - 283) / 10)
@@ -158,8 +154,8 @@ def sim_time(
     cdef dtype z = 2                           # Ca is divalent
     cdef dtype RToverzF = R * temp / (z * F)      # mJ / (mol * K) * K / (C / mol) = mV
 
-    cdef dtype Vth = -35
-    cdef dtype Delta = 5
+    # cdef dtype Vth = -35
+    # cdef dtype Delta = 5
 
     cdef int nsteps = len(t)
 
@@ -489,7 +485,7 @@ def sim_time(
         for k in range(m):
             # Rewritten to avoid overflow under standard conditions
             npre = int(conns[k,1])
-            e = exp((Vth - Vx[npre, i-1]) / Delta)
+            e = exp((-35.0 - Vx[npre, i-1]) / 5.0)
             sinf = 1 / (1 + e)
             stau =  conns[k,4] * (1 - sinf) / tau_temp_factor_conns[k]     # 1 / ms^-1 = ms
 

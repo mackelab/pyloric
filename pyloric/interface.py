@@ -120,10 +120,17 @@ def simulate(
     noise_std: float = 0.001,
     track_energy: bool = False,
     track_currents: bool = False,
+    track_calcium: bool = False,
     energy_measure: str = "power",
     seed: Optional[int] = None,
     customization: Dict = {},
     defaults: Dict = {},
+    Esglut=[-70, -70, -70, -70, -70],
+    kminusglut=[40, 40, 40, 40, 40],
+    Eschol=[-80, -80],
+    kminuschol=[100, 100],
+    Vth=[-35, -35, -35, -35, -35, -35, -35],
+    Delta=[5, 5, 5, 5, 5, 5, 5],
 ):
     r"""
     Runs the STG model with a subset of all parameters.
@@ -144,6 +151,7 @@ def simulate(
             $I = g \cdot (V-E)$. For the calcium channels, the reversal potential of
             the calcium channels is also saved. The output dictionary will have
             additional entries 'membrane_conds', 'synaptic_conds', 'reversal_calcium'.
+        track_calcium: Returns intracellular calcium.
         seed: Possible seed for the simulation.
         customization:  If you want to exclude some of the `circuit_parameters` and use
             constant default values for them, you have to set these entries to `False`
@@ -220,7 +228,13 @@ def simulate(
     I = rng.normal(scale=noise_std, size=(3, len(t)))
 
     # Convert conductances from log(mS) to mS.
-    conns = build_conns(-np.exp(synaptic_conductances_pd.to_numpy()[0]))
+    conns = build_conns(
+        -np.exp(synaptic_conductances_pd.to_numpy()[0]),
+        Esglut=Esglut,
+        kminusglut=kminusglut,
+        Eschol=Eschol,
+        kminuschol=kminuschol,
+    )
     data = sim_time(
         dt,
         t,
@@ -240,6 +254,8 @@ def simulate(
         init=None,
         start_val_input=0.0,
         verbose=False,
+        Vth=np.asarray(Vth),
+        Delta=np.asarray(Delta),
     )
 
     results_dict = {"voltage": data["Vs"], "dt": dt, "t_max": t_max}
@@ -250,6 +266,8 @@ def simulate(
         results_dict.update({"synaptic_conds": data["synaptic_conds"]})
         results_dict.update({"reversal_calcium": data["reversal_calcium"]})
         results_dict.update({"n_Kd": data["n_Kd"]})
+    if track_calcium:
+        results_dict.update({"intracellular_calcium": data["Cas"]})
 
     return results_dict
 
