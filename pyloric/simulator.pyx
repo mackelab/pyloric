@@ -48,8 +48,6 @@ def sim_time(
     init = None,
     start_val_input=0.0,
     bint verbose = True,
-    Vth=np.asarray([-35, -35, -35, -35, -35, -35, -35]),
-    Delta=np.asarray([5, 5, 5, 5, 5, 5, 5]),
 ):
     """
     Simulates the model for a specified time duration.
@@ -122,10 +120,6 @@ def sim_time(
 
     modelx = np.asarray(modelx)
 
-    # adding the Q10-value
-    #cdef dtype g_q10 = 1.5
-    #cdef dtype g_temp_factor = g_q10 ** ((temp - 283) / 10)
-
     # Parameters
     cdef np.ndarray[dtype] gNax    = modelx.T[0] * g_temp_factor_memb[0]
     cdef np.ndarray[dtype] gCaTx   = modelx.T[1] * g_temp_factor_memb[1]
@@ -153,9 +147,6 @@ def sim_time(
     cdef dtype F = 96485.3415;                 # C / mol
     cdef dtype z = 2                           # Ca is divalent
     cdef dtype RToverzF = R * temp / (z * F)      # mJ / (mol * K) * K / (C / mol) = mV
-
-    # cdef dtype Vth = -35
-    # cdef dtype Delta = 5
 
     cdef int nsteps = len(t)
 

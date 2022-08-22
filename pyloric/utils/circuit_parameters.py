@@ -121,19 +121,20 @@ def build_conns(
     kminusglut=[40, 40, 40, 40, 40],
     Eschol=[-80, -80],
     kminuschol=[100, 100],
+    Vth=[-35.0, -35.0, -35.0, -35.0, -35.0, -35.0, -35.0],
+    Delta=[5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0],
 ):
-
     # Reversal voltages and dissipation time constants for the synapses, taken from
     # Prinz 2004, p. 1351
     return np.asarray(
         [
-            [1, 0, params[0], Esglut[0], kminusglut[0]],
-            [1, 0, params[1], Eschol[0], kminuschol[0]],
-            [2, 0, params[2], Esglut[1], kminusglut[1]],
-            [2, 0, params[3], Eschol[1], kminuschol[1]],
-            [0, 1, params[4], Esglut[2], kminusglut[2]],
-            [2, 1, params[5], Esglut[3], kminusglut[3]],
-            [1, 2, params[6], Esglut[4], kminusglut[4]],
+            [1, 0, params[0], Esglut[0], kminusglut[0], Vth[0], Delta[0]],
+            [1, 0, params[1], Eschol[0], kminuschol[0], Vth[1], Delta[1]],
+            [2, 0, params[2], Esglut[1], kminusglut[1], Vth[2], Delta[2]],
+            [2, 0, params[3], Eschol[1], kminuschol[1], Vth[3], Delta[3]],
+            [0, 1, params[4], Esglut[2], kminusglut[2], Vth[4], Delta[4]],
+            [2, 1, params[5], Esglut[3], kminusglut[3], Vth[5], Delta[5]],
+            [1, 2, params[6], Esglut[4], kminusglut[4], Vth[6], Delta[6]],
         ]
     )
 

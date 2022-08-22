@@ -234,6 +234,8 @@ def simulate(
         kminusglut=kminusglut,
         Eschol=Eschol,
         kminuschol=kminuschol,
+        Vth=Vth,
+        Delta=Delta,
     )
     data = sim_time(
         dt,
@@ -254,8 +256,6 @@ def simulate(
         init=None,
         start_val_input=0.0,
         verbose=False,
-        Vth=np.asarray(Vth),
-        Delta=np.asarray(Delta),
     )
 
     results_dict = {"voltage": data["Vs"], "dt": dt, "t_max": t_max}
