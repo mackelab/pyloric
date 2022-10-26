@@ -37,11 +37,12 @@ All times are in milliseconds.
 ### Citation
 If you are using this similator, please cite the corresponding paper:
 ```
-@article{deistler2021disparate,
-  title={Disparate energy consumption despite similar network activity},
+@article{deistler2022energy,
+  title={Energy efficient network activity from disparate circuit parameters},
   author={Deistler, Michael and Macke, Jakob H and Gon{\c{c}}alves, Pedro J},
   journal={bioRxiv},
-  year={2021},
+  pages={2021--07},
+  year={2022},
   publisher={Cold Spring Harbor Laboratory}
 }
 ```
