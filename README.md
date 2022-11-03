@@ -35,7 +35,7 @@ All energies are in nJ / <img src="https://render.githubusercontent.com/render/m
 All times are in milliseconds.  
 
 ### Citation
-If you are using this similator, please cite the corresponding paper:
+If you are using this simulator, please cite the corresponding paper:
 ```
 @article{deistler2022energy,
   title={Energy-efficient network activity from disparate circuit parameters},
