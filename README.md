@@ -24,14 +24,14 @@ summary_statistics = summary_stats(simulation_output)
 - simulator in cython (simulation time on single core = 2 seconds for simulated time = 10 seconds).  
 - bounds for reasonable parameter ranges. Prior to sample from this range.  
 - extraction of features from the voltage traces.  
-- simulation at higher temperatures and with custom <img src="https://render.githubusercontent.com/render/math?math=Q_{10}"> values.  
+- simulation at higher temperatures and with custom $Q_10$ values.  
 - calculation of energy consumption of the circuit.
 
 ### Units
-All membrane conductances are in mS / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
+All membrane conductances are in mS / cm$^2$.  
 All synaptic conductances are in log(mS) (natural log).
 All voltages are in mV.  
-All energies are in nJ / <img src="https://render.githubusercontent.com/render/math?math=\text{cm}^2">.  
+All energies are in nJ / cm$^2$.  
 All times are in milliseconds.  
 
 ### Citation
