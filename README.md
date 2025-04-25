@@ -5,7 +5,7 @@ The model was proposed in Prinz, Bucher, Marder, Nature Neuroscience, 2004.
 
 ### Installation 
 ```
-git clone https://github.com/mackelab/pyloric.git
+git clone git@github.com:mackelab/pyloric.git
 cd pyloric
 pip install .
 ```
